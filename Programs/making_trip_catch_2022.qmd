@@ -1,0 +1,83 @@
+---
+title: "making_trip_catch_2022"
+format: html
+editor: visual
+---
+
+## Make trip_catch_2022
+
+Joins and cleans [NOAA APAIS 2022](https://www.fisheries.noaa.gov/recreational-fishing-data/recreational-fishing-data-downloads) data for mapping purposes. Also uses active_sites from making_buffer_zip.qmd. For more see izzy_zheng_readme.txt
+
+load packages+data
+
+```{r}
+#packages
+library(tidyverse)
+library(here)
+
+#load data
+data_path <- here('data') #relative path to the data folder
+#catch data
+catch_20221 <- read.csv(here('data', 'NOAA MRF', 'catch_20221.csv'))
+catch_20222 <- read.csv(here('data', 'NOAA MRF', 'catch_20222.csv'))
+catch_20223 <- read.csv(here('data', 'NOAA MRF', 'catch_20223.csv'))
+catch_20224 <- read.csv(here('data', 'NOAA MRF', 'catch_20224.csv'))
+catch_20225 <- read.csv(here('data', 'NOAA MRF', 'catch_20225.csv'))
+catch_20226 <- read.csv(here('data', 'NOAA MRF', 'catch_20226.csv'))
+#trip data
+trip_20221 <- read.csv(here('data', 'NOAA MRF', 'trip_20221.csv'))
+trip_20222 <- read.csv(here('data', 'NOAA MRF', 'trip_20222.csv'))
+trip_20223 <- read.csv(here('data', 'NOAA MRF', 'trip_20223.csv'))
+trip_20224 <- read.csv(here('data', 'NOAA MRF', 'trip_20224.csv'))
+trip_20225 <- read.csv(here('data', 'NOAA MRF', 'trip_20225.csv'))
+trip_20226 <- read.csv(here('data', 'NOAA MRF', 'trip_20226.csv'))
+#bufferzip
+load(here('data','intermediate_datasets','buffer_zip.RData'))
+```
+
+Start wrangling
+
+```{r}
+#combine waves
+catch_2022 <- rbind(catch_20221,catch_20222,catch_20223,catch_20224, catch_20225, catch_20226)
+trip_2022 <-rbind(trip_20221,trip_20222,trip_20223,trip_20224, trip_20225, trip_20226)
+#remove excess datasets
+rm(catch_20221,catch_20222,catch_20223,catch_20224,catch_20225,catch_20226)
+rm(trip_20221,trip_20222,trip_20223,trip_20224,trip_20225,trip_20226)
+
+#filter trip data to Chesapeake Bay; all angler interviews in which the angler says they are going to fish in CB
+trip_2022 <- trip_2022 |>
+  filter(AREA=="F")
+#edit zipcode variable so it's a character
+trip_2022 <- trip_2022 |>
+  mutate(ZIP = case_when(
+    nchar(ZIP) == 5 ~ as.character(ZIP),
+    nchar(ZIP) == 4 ~ paste("0",as.character(ZIP),sep=""),
+    nchar(ZIP) == 3 ~ paste("00",as.character(ZIP),sep="")
+  ))
+#recode "" in the catch common variable as NA
+catch_2022$common[catch_2022$common == ""] <- NA
+#join trip and catch data together by all shared variables. Now the observation level is one species per angler interview
+trip_catch_2022 <- trip_2022 |>
+  mutate(ID_CODE=as.numeric(ID_CODE))|>
+  filter(month != 99)|>#trip data with no catch data; see https://media.fisheries.noaa.gov/2021-11/MRIP-Data-User-Seminar-Introduction-to-MRIP-Data-2021-10-26.pdf
+  left_join(catch_2022,by=c("ID_CODE"="ID_CODE",
+                            "SUB_REG"="SUB_REG",
+                            "psu_id"="psu_id",
+                            "YEAR"="YEAR",
+                            "ST"="ST",
+                            "strat_id"="strat_id",
+                            "WAVE"="WAVE",
+                            "MODE_FX"="MODE_FX",
+                            "AREA_X"="AREA_X",
+                            "kod"="kod",
+                            "imp_rec"="imp_rec",
+                            "region"="region",
+                            "month"="month",
+                            "wp_int"="wp_int",
+                            "date_published"="date_published"))
+trip_catch_2022 <- trip_catch_2022 |>
+  filter(ZIP %in% buffer_zip$ZCTA5CE20)
+
+save(trip_catch_2022,file=here(data_path,"intermediate_datasets","trip_catch_2022.RData"))#NOT PIVOTED DATA; AT THE SPECIES-TRIPID LEVE
+```

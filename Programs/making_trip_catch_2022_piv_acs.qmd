@@ -1,0 +1,377 @@
+---
+title: "making_trip_catch_2022_piv_acs"
+format: html
+editor: visual
+---
+
+Loads and cleans ACS data, pivots trip_catch_2022 and joins it to ACS data by zip code. Uses trip_catch_2022.RData from making_trip_catch_2022.qmd. For more see izzy_zheng_readme.txt.
+
+```{r}
+#packages
+library(tidyverse)
+library(here)
+
+#load data
+data_path <- here('data') #relative path to the data folder
+load(here('data','intermediate_datasets','trip_catch_2022.RData'))
+```
+
+Making ACS dataset.
+
+Economic
+
+```{r}
+#note that the joining here is a bit off; we're joining 2022 fish data to 2020 data (even though it says 2021, it's about 'over the last 12 months', which would be the year before 2021)
+#is the 2022 data really for 2021??
+acs_economic <- read.csv(here('data', 'acs_data', 'acs_economic','ACSDP5Y2021.DP03-Data.csv'))
+acs_economic <- acs_economic|>
+  mutate(unemployment = DP03_0009PE|>as.numeric(),
+         pct_pov = DP03_0119PE|>as.numeric(),
+         income = DP03_0062E|> as.numeric()/1000)|>
+  select(GEO_ID,
+         NAME,
+         unemployment, #unemployment rate in the civilian labor force
+         pct_pov,#percentage of families and people with income over the last year under the federal poverty level
+         income)|> #median household income
+  mutate(ZIP=GEO_ID|>str_sub(-5))
+
+defns <- acs_economic[1,] #descriptions of each variable
+acs_economic <- acs_economic[-1,] #delete first row (which were definitions)
+#remove duplicates and replace - w NA
+acs_economic <- acs_economic |>
+  unique() |>
+  replace("-",NA) #replace all the "-" with NA
+
+save(defns,file=here(data_path,"intermediate_datasets","acs_ec_defns.RData"))#
+save(acs_economic,file=here(data_path,"intermediate_datasets","acs_economic_cleaner.RData"))#poverty and unemployment data at the zip code level in all of the states surrounding the Chesapeake
+```
+
+immigrant
+
+```{r}
+acs_imm <- read.csv(here('data', 'acs_data', 'acs_imm','ACSDP5Y2021.DP02-Data.csv'))
+acs_imm <- acs_imm|>
+  mutate(noncit = DP02_0097PE|>as.numeric(),
+         not_english = DP02_0114PE|>as.numeric(), #primary lang at home is not English
+         bad_english = DP02_0015PE|>as.numeric(), #their english isn't good and prim lang at home is not english
+         college = DP02_0068PE|>as.numeric()) |> #pct college educated or more 
+  select(noncit,
+         not_english,
+         bad_english,
+         college,
+         GEO_ID)|> #percentage of families and people with income over the last year under the federal poverty level 
+  mutate(ZIP=GEO_ID|>str_sub(-5))
+
+defns <- acs_imm[1,] #descriptions of each variable
+acs_imm <- acs_imm[-1,] #delete first row (which were definitions)
+#remove duplicates, replace - w NA
+acs_imm <- acs_imm |>
+  unique()|>
+  replace("-",NA) #replace all the "-" with NA
+save(defns,file=here(data_path,"intermediate_datasets","acs_imm_defns.RData"))#
+save(acs_imm,file=here(data_path,"intermediate_datasets","acs_imm_cleaner.RData"))#immigration and education data at the zip code level in all of the states surrounding the Chesapeake
+```
+
+race
+
+```{r}
+acs_race <- read.csv(here('data', 'acs_data', 'acs_race','ACSDP5Y2021.DP05-Data.csv'))
+acs_race <- acs_race|>
+  mutate(white = DP05_0037PE|>as.numeric(), #all are percentages
+         black = DP05_0038PE|>as.numeric(), 
+         indigenous = DP05_0039PE|>as.numeric(),
+         asian = DP05_0045PE|>as.numeric(), 
+         pac_islander = DP05_0052PE|>as.numeric(),
+         hispanic = DP05_0071PE|>as.numeric(),
+         nonwhite = 100-as.numeric(DP05_0037PE)) |> #note that these measures exclude multiracial people
+  select(white,
+         black,
+         indigenous,
+         asian,
+         pac_islander,
+         nonwhite,
+         hispanic,
+         GEO_ID)|> #percentage of families and people with income over the last year under the federal poverty level 
+  mutate(ZIP=GEO_ID|>str_sub(-5))
+#don't worry about the warning that says there are NA's being introduced by coercion; they are a result from "-" from white turning into NA's
+
+defns <- acs_race[1,] #descriptions of each variable
+acs_race <- acs_race[-1,] #delete first row (which were definitions)
+
+save(defns,file=here(data_path,"intermediate_datasets","acs_race_defns.RData"))#
+
+#remove duplicates and replace - w NA
+acs_race <- acs_race |>
+  unique()|>
+  replace("-",NA) #replace all the "-" with NA
+
+save(acs_race,file=here(data_path,"intermediate_datasets","acs_race_cleaner.RData"))#immigration and education data at the zip code level in all of the states surrounding the Chesapeake
+```
+
+If you want to only want to rerun the pivoting + data cleaning code without reloading the ACS data, you can clear all your data and run the following codeblock:
+
+```{r}
+data_path <- here('data') #relative path to the data folder
+load(here('data','intermediate_datasets','trip_catch_2022.RData'))
+load(here('data','intermediate_datasets','acs_economic_cleaner.RData'))
+load(here('data','intermediate_datasets','acs_race_cleaner.RData'))
+load(here('data','intermediate_datasets','acs_imm_cleaner.RData'))
+```
+
+pivot dataset
+
+```{r}
+#pivot data so that it is at trip ID level rather than species level.
+trip_catch_2022 <- trip_catch_2022 |>
+  select(-sp_code,-tot_len_a,-tot_len_b1,-tot_len)|>#143149 when only excluding spcode #no species code or length of fish
+  mutate(ID_CODE=as.character(ID_CODE))|>
+  group_by(ID_CODE)
+  
+trip_catch_2022_piv <- trip_catch_2022 |>
+  group_by(ID_CODE)|>
+  reframe(prim_caught = case_when(
+    max(wgt_b1) == wgt_b1[1] ~ common[1],
+    max(wgt_b1) == wgt_b1[2] ~ common[2],
+    max(wgt_b1) == wgt_b1[3] ~ common[3],
+    max(wgt_b1) == wgt_b1[4] ~ common[4],
+    max(wgt_b1) == wgt_b1[5] ~ common[5],
+    max(wgt_b1) == wgt_b1[6] ~ common[6],
+  ),
+    #catch variables I thought were important
+          wave=WAVE[1],
+          kod=kod[1],#kind of day
+          mode_fx=MODE_FX[1],#type of fishing
+          wp_int=wp_int[1],#did a quick check; wp_int has only 1 value per trip id. this is weighting variable
+          
+          #trip variables I thought were important
+          prim2_common=prim2_common[1],#common name of second most desired fish
+          prim1_common=prim1_common[1],#common name of most desired fish
+          st_res=ST_RES[1],#state of residence
+          cnty_res=CNTY_RES[1],#county of residence
+          hrsf=HRSF[1],#hours fished
+          age=AGE[1],#note 99 means refused
+          ffdays2=FFDAYS2[1],#days fished in last two months
+          ffdays12=FFDAYS12[1],#days fished in last year
+          intsite=INTSITE[1],#site code
+          mode_f=MODE_F[1],#another mode of fishing variable
+          cntrbtrs=CNTRBTRS[1],
+          area_x=AREA_X[1],#dist from ocean of fishing area
+          boat_hrs=BOAT_HRS[1],#hours on boat
+          zip=ZIP[1],
+          month=month[1],
+          county=COUNTY[1],
+          time=TIME[1],
+          mode2001=MODE2001[1],
+          gear=GEAR[1],
+          pvt_res=PVT_RES[1],#do they live in a private residence
+          gender=GENDER[1],
+          age=AGE[1],
+          f_by_p=F_BY_P[1],#fish caught by fisherman
+          date1=DATE1[1],
+          muni_trp=muni_trp[1],#municipality/island of trip
+          distkeys=DISTKEYS[1],#distance from shore, ii
+          leader=LEADER[1],#id code of leader
+          
+          
+          #pivoted variables; catch characteristics
+          species_1=common[1],
+          claim_1=CLAIM[1],
+          claim_unadj_1=CLAIM_UNADJ[1],
+          harvest_1=HARVEST[1],
+          harvest_unadj_1=HARVEST_UNADJ[1],
+          landing_1=landing[1],
+          release_1 = RELEASE[1],
+          release_unadj_1=RELEASE_UNADJ[1],
+          wgt_a_1=wgt_a[1],
+          wgt_b1_1=wgt_b1[1],
+          tot_cat_1 = tot_cat[1],
+          
+          
+          species_2=common[2],
+          claim_2=CLAIM[2],
+          claim_unadj_2=CLAIM_UNADJ[2],
+          harvest_2=HARVEST[2],
+          harvest_unadj_2=HARVEST_UNADJ[2],
+          landing_2=landing[2],
+          release_2 = RELEASE[2],
+          release_unadj_2=RELEASE_UNADJ[2],
+          wgt_a_2=wgt_a[2],
+          wgt_b1_2=wgt_b1[2],
+          tot_cat_2 = tot_cat[2],
+                    
+          species_3=common[3],
+          claim_3=CLAIM[3],
+          claim_unadj_3=CLAIM_UNADJ[3],
+          harvest_3=HARVEST[3],
+          harvest_unadj_3=HARVEST_UNADJ[3],
+          landing_3=landing[3],
+          release_3 = RELEASE[3],
+          release_unadj_3=RELEASE_UNADJ[3],
+          wgt_a_3=wgt_a[3],
+          wgt_b1_3=wgt_b1[3],
+          tot_cat_3 = tot_cat[3],
+
+          species_4=common[4],
+          claim_4=CLAIM[4],
+          claim_unadj_4=CLAIM_UNADJ[4],
+          harvest_4=HARVEST[4],
+          harvest_unadj_4=HARVEST_UNADJ[4],
+          landing_4=landing[4],
+          release_4 = RELEASE[4],
+          release_unadj_4=RELEASE_UNADJ[4],
+          wgt_a_4=wgt_a[4],
+          wgt_b1_4=wgt_b1[4],
+          tot_cat_4 = tot_cat[4],
+
+          species_5=common[5],
+          claim_5=CLAIM[5],
+          claim_unadj_5=CLAIM_UNADJ[5],
+          harvest_5=HARVEST[5],
+          harvest_unadj_5=HARVEST_UNADJ[5],
+          landing_5=landing[5],
+          release_5 = RELEASE[5],
+          release_unadj_5=RELEASE_UNADJ[5],
+          wgt_a_5=wgt_a[5],
+          wgt_b1_5=wgt_b1[5],
+          tot_cat_5 = tot_cat[5],
+
+          species_6=common[6],
+          claim_6=CLAIM[6],
+          claim_unadj_6=CLAIM_UNADJ[6],
+          harvest_6=HARVEST[6],
+          harvest_unadj_6=HARVEST_UNADJ[6],
+          landing_6=landing[6],
+          release_6 = RELEASE[6],
+          release_unadj_6=RELEASE_UNADJ[6],
+          wgt_a_6=wgt_a[6],
+          wgt_b1_6=wgt_b1[6],
+          tot_cat_6 = tot_cat[6],
+
+          species_7=common[7],
+          claim_7=CLAIM[7],
+          claim_unadj_7=CLAIM_UNADJ[7],
+          harvest_7=HARVEST[7],
+          harvest_unadj_7=HARVEST_UNADJ[7],
+          landing_7=landing[7],
+          release_7 = RELEASE[7],
+          release_unadj_7=RELEASE_UNADJ[7],
+          wgt_a_7=wgt_a[7],
+          wgt_b1_7=wgt_b1[7],
+          tot_cat_7 = tot_cat[7]
+)
+    #note: common and species name have same # na's 
+```
+
+add ej variables + mutate new ones
+
+```{r}
+trip_catch_2022_piv_acs <-
+  trip_catch_2022_piv |>
+  left_join(acs_economic, by=c("zip"="ZIP"))|>
+  left_join(acs_imm, by=c("zip"="ZIP"))|>
+  left_join(acs_race, by=c("zip"="ZIP"))
+
+trip_catch_2022_piv_acs<-trip_catch_2022_piv_acs |>
+  mutate(
+         percent_eaten = case_when(
+           rowSums(across(starts_with('tot_cat')),na.rm=TRUE) == 0 ~ NA,
+           TRUE ~ 100*rowSums(across(starts_with('landing')),na.rm=TRUE)/rowSums(across(starts_with('tot_cat')),na.rm=TRUE)))|>
+  select(-starts_with('GEO_ID'),-starts_with('-'),-NAME)
+```
+
+data cleaning
+
+```{r}
+trip_catch_2022_piv_acs <-
+  trip_catch_2022_piv_acs |>
+  mutate(age = case_when( #if age == 99, replace with NA
+    age == 99 ~ NA,
+    TRUE ~ age
+  ),
+  boat_hrs = case_when(
+    boat_hrs == 99.9 ~ NA,
+    TRUE~boat_hrs
+  ),
+  st_res = case_when(
+    st_res == 99 ~ NA,
+    TRUE~st_res
+  ),
+  cnty_res = case_when(
+    cnty_res > 996 ~ NA,
+    TRUE~st_res),
+  ffdays2 = case_when(
+    ffdays2 > 97 ~ NA,
+    TRUE~ffdays2),
+  ffdays12 = case_when(
+    ffdays12 > 997 ~ NA,
+    TRUE~ffdays12),
+  gear = case_when(
+    gear > 97 ~ NA,
+    TRUE~gear),
+  gender = case_when(
+    gender == 0 ~ NA,
+    gender == 9 ~ NA,
+    TRUE~gender),
+  prim1_common = case_when(
+    prim1_common == "" ~ NA,
+    TRUE~prim1_common),
+  prim2_common = case_when(
+    prim2_common == "" ~ NA,
+    TRUE~prim2_common),
+  zip = case_when(
+    zip %in% c('99999','99997','99998') ~ NA,#99997 is foreign, 99998 unrecorded,99999 refused
+    TRUE~zip),
+  county = case_when(
+    county == "" ~ NA,
+    TRUE~county),
+  mode2001 = as.character(mode2001),
+  mode_f=as.character(mode_f),
+  mode_fx=as.character(mode_fx),
+  intsite = as.character(intsite),
+  mode_reg = case_when(
+    mode_fx %in% c(1,2,3) ~ 'shore',
+    mode_fx %in% c(4,5) ~ 'with captain',
+    mode_fx == 7 ~ 'private/rental boat'
+  ),
+  black_quartile = case_when(
+    between(black,0,8.1) ~ 0,
+    between(black,8.1,15.5) ~ .25,
+    between(black,15.5,29.2) ~ .5,
+    between(black,29.2,100) ~ .75
+  ),
+  not_english_quartile = case_when(
+    between(not_english,0,4.9) ~ 0,
+    between(not_english,4.9,8.4) ~ .25,
+    between(not_english,8.4,13.5) ~ .5,
+    between(not_english,13.5,76.6) ~ .75
+  ),
+  unemployment_quartile = case_when(
+    between(unemployment,0,3.5) ~ 0,
+    between(unemployment,3.5,4.4) ~ .25,
+    between(not_english,4.4,5.9) ~ .5,
+    between(not_english,5.9,32.9) ~ .75)
+  ) |>
+  mutate(common_fish=case_when(
+    prim_caught %in%  c("SUMMER FLOUNDER","STRIPED BASS","BLACK SEA BASS",
+                        "SPOT","BLUEFISH","WHITE PERCH","TAUTOG","AMERICAN SHAD","BLUE CATFISH","SEA TROUT") ~ prim_caught,
+    
+    TRUE ~ "OTHER"),
+    desired_fish = case_when(
+      common_fish == "OTHER" ~ 0,
+      TRUE ~ 1
+    ),
+    sig_fish = case_when(
+      prim_caught %in% c("ATLANTIC MENHADEN",'BLACK CRAPPIE','BLUE CATFISH','CHANNEL CATFISH','COBIA','MUMMICHOG','NORTHERN SNAKEHEAD','SEAROBIN FAMILY','SPANISH MACKEREL','SPOT','SUMMER FLOUNDER','UNIDENTIFIED CATFISHES','WHITE CATFISH','WHITE CRAPPIE','WHITE PERCH') ~ prim_caught,
+      TRUE ~ "OTHER"
+    )
+    )
+#note: celltype and add_hrs only have 1 value the whole dataset, therefore omitting. they may be different in other years, but they have no impact on dataset since they only have one value. ommitting year for the same reason, but for future datasets merging over time obvs add year back in
+#note: i am not coding f_by_p to be NA when there is no available catch, as this may impact likelihood of consumption
+#note: i initially put in variable muni_res, municipality of residence, but it actually has no unique values, just NA
+#same for dist
+
+```
+
+```{r}
+save(trip_catch_2022_piv_acs,file=here(data_path,"intermediate_datasets","trip_catch_2022_piv_acs.RData"))#note: now the observation level is ID_CODE (or angler interview), NOT angler
+```

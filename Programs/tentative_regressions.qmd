@@ -1,0 +1,221 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+## tentative regressions
+
+Run preliminary regressions on trip_catch_2022_piv_acs.RData, from making_trip_catch_2022_piv_acs.RData. For more see izzy_zheng_readme.txt.
+
+```{r}
+library(fixest)
+library(here)
+library(tidyverse)
+data_path <- here('data')
+load(here('data','intermediate_datasets',"trip_catch_2022_piv_acs.RData"))
+```
+
+proportion eaten
+
+```{r}
+#filter out NA's for percent_eaten; there are na's where tot_cat of the fisher == 0
+percent_eaten_reg_data <- trip_catch_2022_piv_acs |>
+  filter(tot_cat_1 >0)|>
+  select(unemployment,income,not_english,black,nonwhite,
+         mode_reg,hrsf,age,ffdays2,cntrbtrs,gender,wave,
+         intsite,percent_eaten, st_res,wp_int,desired_fish)|>
+  na.omit()
+```
+
+```{r}
+reg<-lm(formula= percent_eaten ~ unemployment + income + not_english + black + #ej vars
+        mode_reg + hrsf + age + ffdays2 + cntrbtrs +
+        gender + st_res,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+reg_df<-summary(reg)
+reg_df
+```
+
+add intsite
+
+```{r}
+reg_site <-lm(formula = percent_eaten ~ income + unemployment + not_english + black + #ej vars
+        mode_reg + hrsf + age + ffdays2 + cntrbtrs +
+        gender + st_res + intsite, 
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+reg_site
+```
+
+add species
+
+```{r}
+reg_common_fish <-lm(formula = percent_eaten ~ income + unemployment + not_english + black + #ej vars
+        mode_reg + hrsf + age + ffdays2 + cntrbtrs +
+        gender + st_res + common_fish, 
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(reg_primcaught)
+```
+
+desired fish dummy
+
+```{r}
+reg_desired_fish <-lm(formula = percent_eaten ~ income + unemployment + not_english + black + #ej vars
+        mode_reg + hrsf + age + ffdays2 + cntrbtrs +
+        gender + st_res + desired_fish,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+```
+
+```{r}
+reg_nocharter <- lm(formula = percent_eaten ~ income + unemployment + not_english + black + #ej vars
+        mode_reg + hrsf + age + ffdays2 + cntrbtrs +
+        gender + st_res, 
+  data=percent_eaten_reg_data |> filter(mode_reg != "with captain"),
+      weights = percent_eaten_reg_data|> filter(mode_reg != "with captain")|>select(wp_int)|>pull())
+```
+
+```{r}
+stargazer(bare_reg, reg,reg_site,reg_desired_fish, type="text",out=here('Results','RecFishing','RegTable4.txt'), title = "Regression Results")
+```
+
+move st res to fixed
+
+```{r}
+bare_reg<-feols(fml = percent_eaten ~ unemployment + income + not_english + black + 
+                  wave + age+gender + ffdays2 + hrsf + cntrbtrs + prim1_common +
+                  mode_reg +intsite + prim_caught  + st_res, #ej vars,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(bare_reg)
+```
+
+almost no controls version
+
+```{r}
+bare_reg<-lm(formula = percent_eaten ~ income + unemployment + not_english + black, #ej vars,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(bare_reg)
+```
+
+add wave
+
+```{r}
+bare_reg<-feols(fml = percent_eaten ~ unemployment + not_english + black + wave| st_res, #ej vars,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(bare_reg)
+```
+
+add age,gender
+
+```{r}
+bare_reg<-feols(fml = percent_eaten ~ unemployment + not_english + black + wave +
+                  age+gender| st_res, #ej vars,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(bare_reg)
+```
+
+add ffdays2,hrsf
+
+```{r}
+bare_reg<-feols(fml = percent_eaten ~ unemployment + not_english + black + wave +
+                  age+gender + ffdays2 + hrsf| st_res, #ej vars,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(bare_reg)
+```
+
+add cntrbtrs
+
+```{r}
+bare_reg<-feols(fml = percent_eaten ~ unemployment + not_english + black + wave +
+                  age+gender + ffdays2 + hrsf + cntrbtrs| st_res, #ej vars,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(bare_reg)
+
+```
+
+add primm1 common
+
+```{r}
+bare_reg<-feols(fml = percent_eaten ~ unemployment + not_english + black + wave +
+                  age+gender + ffdays2 + hrsf + cntrbtrs + prim1_common| st_res, #ej vars,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(bare_reg)
+```
+
+add mode
+
+```{r}
+bare_reg<-feols(fml = percent_eaten ~ unemployment + not_english + black + wave +
+                  age+gender + ffdays2 + hrsf + cntrbtrs + prim1_common + mode_fx| st_res, #ej vars,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(bare_reg)
+```
+
+add intsite
+
+```{r}
+bare_reg<-feols(fml = percent_eaten ~ unemployment + not_english + black + wave +
+                  age+gender + ffdays2 + hrsf + cntrbtrs + prim1_common + mode_fx
+                +intsite| st_res, #ej vars,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(bare_reg)
+```
+
+add primcaught
+
+```{r}
+bare_reg<-feols(fml = percent_eaten ~ unemployment + not_english + black + wave +
+                  age+gender + ffdays2 + hrsf + cntrbtrs + prim1_common + mode_fx
+                +intsite + prim_caught| st_res, #ej vars,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(bare_reg)
+```
+
+add gear
+
+```{r}
+bare_reg<-feols(fml = percent_eaten ~ unemployment + not_english + black + wave +
+                  age+gender + ffdays2 + hrsf + cntrbtrs + prim1_common + mode_fx
+                +intsite + prim_caught  | st_res, #ej vars,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(bare_reg)
+```
+
+```{r}
+bare_reg<-feols(fml = percent_eaten ~ unemployment + not_english + black #ej vars
+                + wave + #month proxy
+                  age+gender + 
+                  ffdays2 + hrsf + #days fished in last 2 months, hoursefished
+                cntrbtrs + prim1_common + #fish they were looking for
+                  mode_fx +intsite + prim_caught   + st_res, #ej vars,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(bare_reg)
+```
+
+why fbyp, change mode_f to categorical,
+
+try clustering? like unemp + college + pov rate + income, noncit+not_english, modes clustered together, avidity clustered together, intsite by body of water/county, fish categories? see matt's old paper about categorizing fish
+
+quartile ej version
+
+```{r}
+reg<-feols(fml = percent_eaten ~ unemployment_quartile + black_quartile + not_english_quartile + zip,#ej vars
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+summary(reg)
+```

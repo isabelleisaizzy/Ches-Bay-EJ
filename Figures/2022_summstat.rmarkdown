@@ -1,0 +1,125 @@
+---
+title: "regression_summ_stats"
+format: html
+editor: visual
+---
+
+
+setup
+
+
+```{r}
+#| warning: false
+library(tidyverse)
+library(here)
+library(psych)
+data_path <- here('data')
+load(here('data','intermediate_datasets',"trip_catch_2022_piv_acs.RData"))
+```
+
+
+divide dataset into controls, intermediate variables, and dependent + independent variables, filter out character variables
+
+
+```{r}
+str_vars <- trip_catch_2022_piv_acs |>
+  select(where(is.character),gender,f_by_p)
+intermed_vars <- trip_catch_2022_piv_acs |>
+  select(ID_CODE,starts_with('species'),starts_with('claim'),
+         starts_with('harvest'),starts_with('landing'),starts_with('release'),
+         starts_with('wgt'),starts_with('tot_cat'),wp_int)|>
+  select(where(is.numeric))
+dep_indep <-trip_catch_2022_piv_acs |>
+  select(prop_eaten,#dep var
+         unemployment,pct_pov,noncit,not_english,college,black,white,asian,
+         indigenous,pac_islander,hispanic,nonwhite,prop_eaten)|>
+  select(where(is.numeric))
+controls <- trip_catch_2022_piv_acs |>
+  select(-(intermed_vars|>names()),
+         -(dep_indep|>names()))|>
+  select(where(is.numeric))
+         
+
+```
+
+
+summary statistics - controls (may be categorical or not)
+
+
+```{r}
+controls_summstat <- describe(controls,fast=TRUE)
+intermed_summstat <- describe(intermed_vars,fast=TRUE)
+depindep_summstat <- describe(dep_indep,fast=TRUE)
+```
+
+```{r}
+controls_summstat|>select(-vars)
+intermed_summstat|>select(-vars)
+depindep_summstat|>select(-vars)
+```
+
+
+summary statistics - frequency tables of categorical variables (may include controls)
+
+
+```{r}
+kod_freq <- table(str_vars$kod)|>as.data.frame()
+prim1_common_freq <- table(str_vars$prim1_common)|>as.data.frame()
+prim2_common_freq <- table(str_vars$prim2_common)|>as.data.frame()
+```
+
+```{r}
+kod_freq
+prim1_common_freq
+prim2_common_freq
+```
+
+```{r}
+zip_freq <- table(str_vars$zip)|>as.data.frame()
+county_freq <- table(str_vars$county)|>as.data.frame()
+date1_freq <- table(str_vars$date1)|>as.data.frame()
+```
+
+```{r}
+zip_freq
+county_freq
+date1_freq
+```
+
+```{r}
+gender_freq <- table(str_vars$gender)|>as.data.frame()
+f_by_p_freq <- table(str_vars$f_by_p)|>as.data.frame()
+gear_freq <- table(str_vars$gear)|>as.data.frame()
+intsite_freq <- table(str_vars$intsite)|>as.data.frame()
+```
+
+```{r}
+gender_freq 
+f_by_p_freq 
+gear_freq
+intsite_freq
+```
+
+```{r}
+leader_freq <- table(str_vars$leader)|>as.data.frame() #honestly probably don't need to use this variable
+species_1_freq <- table(str_vars$species_1)|>as.data.frame()
+species_2_freq <- table(str_vars$species_2)|>as.data.frame()
+species_3_freq <- table(str_vars$species_3)|>as.data.frame()
+species_4_freq <- table(str_vars$species_4)|>as.data.frame()
+species_5_freq <- table(str_vars$species_5)|>as.data.frame()
+species_6_freq <- table(str_vars$species_6)|>as.data.frame()
+species_7_freq <- table(str_vars$species_7)|>as.data.frame()
+#would be good to wrangle a new variable that is species they caught the most of in weight
+```
+
+```{r}
+leader_freq 
+species_1_freq 
+species_2_freq 
+species_3_freq 
+species_4_freq 
+species_5_freq 
+species_6_freq 
+species_7_freq 
+```
+

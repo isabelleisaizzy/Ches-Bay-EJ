@@ -1,0 +1,622 @@
+---
+title: "2022_visualizations"
+format: html
+editor: visual
+---
+
+makes data visualizations using trip_catch_2022 from making_trip_catch_2022, buffer_zip from making_buffer_zip.qmd, active_sites from making_buffer_zip.qmd. For more see izzy_zheng_readme.txt
+
+Setup
+
+```{r}
+library(tidyverse)
+library(here)
+library(readr)
+library(sf)
+library(mapview)
+library(RColorBrewer)
+```
+
+```{r}
+#load data
+data_path <- here('data') #relative path to the data folder
+```
+
+load data. These datasets were made in the making_intermediate_datasets file in "Programs".
+
+```{r}
+load(here('data','intermediate_datasets','buffer_zip.RData'))
+load(here('data','intermediate_datasets','trip_catch_2022.RData'))
+load(here('data',"intermediate_datasets","active_sites.Rdata"))
+```
+
+Visualizations
+
+group tripcatch by zip code, convert buffer_zip to character form
+
+```{r}
+tripcatch_2022_zip <- trip_catch_2022 |> #recall this is at the id code and species level
+  group_by(ID_CODE)|>
+  reframe(landing = sum(landing)*wp_int,
+          CLAIM = sum(CLAIM)*wp_int,
+          tot_cat = sum(tot_cat)*wp_int,
+          LEADER = LEADER[1], #leader is a trip variable so it's the same for each ID
+          CNTRBTRS = CNTRBTRS[1]*wp_int,#cntrbtrs is also trip variable 
+          ZIP=ZIP[1],
+          wp_int = wp_int[1])|>
+  group_by(ZIP)|>
+  reframe(num_eaten = sum(landing),
+          num_claim = sum(CLAIM),
+          num_tot = sum(tot_cat),
+          num_trips = sum(wp_int),
+          num_id_codes = n(),
+          num_angler_trips = sum(CNTRBTRS))|>
+  mutate(fish_per_angler_trip=case_when(
+    num_angler_trips > 0 ~ num_claim/num_angler_trips,
+    TRUE~ 0),
+         claim_per_trip = num_claim/num_trips,
+    frac_eaten = case_when(
+      num_tot > 0 ~ num_eaten/num_tot,
+      TRUE~NA),
+    num_eaten_ln = case_when(
+      num_eaten == 0 ~ log(1), #if sum(landing) is 0, make it 1 instead
+      TRUE ~ log(num_eaten)),
+    num_claim_ln = case_when(
+      num_claim == 0 ~ log(1), #if sum(claim) is 0, make it 1 instead
+      TRUE ~ log(num_claim)),
+    num_trips_ln = case_when(
+      num_trips == 0 ~ log(1), #if sum(claim) is 0, make it 1 instead
+      TRUE ~ log(num_trips)),
+    num_angler_trips_ln = case_when(
+      num_angler_trips == 0 ~ log(1), #if sum(claim) is 0, make it 1 instead
+      TRUE ~ log(num_angler_trips)))
+
+#angler-trip represents per person per trip
+```
+
+join zip and tripcatch together
+
+filter to zip codes that went on at least 10 trips per year (based off [this one paper](https://www.sciencedirect.com/science/article/pii/S0308597X20304863?casa_token=hYS1-DN8O84AAAAA:tZPPPT_9FTJYyDb41PEGLioR3lhHdM5gCxKxBYpx_u-1kxwXc11hKzoLmRwDtobw1lND8DjJ#sec4)'s study of Santa Barbara subsistence fishers, where 82% of fishers fished 1x/month or more. would be good to do a broader literature review to confirm this is a good number). the num_eaten si pretty arbitrary, based off the fish histogram distribution
+
+```{r}
+tripcatch_2022_zip <- buffer_zip |> 
+  left_join(tripcatch_2022_zip,by=c("ZCTA5CE20"="ZIP"))
+
+#if we do a right join with zip, you'll get all the zip codes but no relative knowledge of where they are
+```
+
+summary distribution type visualizations
+
+note: in terms of obs where number of fish = 0, three options:
+
+1.  filter out these observations. then the map shows fishing variation conditional on the zip code bringing in some fish
+    1.  this causes more even distribution, which makes the map easier to look at.
+
+    2.  zip codes that bring in no fish will appear different than zip codes that bring in no fish but go fishing
+2.  recoding all zip codes in radius of interest that are not in NOAA to have 0 fish. then the map shows fishing variation with no conditional on fishing behavior
+    1.  perhaps more consistent
+
+    2.  zip codes that bring in no fish will appear the same as zip codes that bring in no fish and go fishing
+3.  nothing. then the map shows fishing variation conditional on the zip code fishing, no matter how successful that zip code is
+    1.  for the question of likelihood to consume, this would be best option
+    2.  zip codes that bring in no fish will appear different than zip codes that bring in no fish but go fishing
+    3.  I end up choosing this for all maps
+
+fish distribution
+
+```{r}
+ggplot(data = tripcatch_2022_zip|>filter(num_claim>0), aes(x=num_claim))+geom_histogram()
+```
+
+ln fish distribution
+
+```{r}
+ggplot(data = tripcatch_2022_zip|>filter(num_claim>0), aes(x=num_claim_ln))+geom_histogram()
+```
+
+angler trip distribution
+
+```{r}
+ggplot(data = tripcatch_2022_zip|>filter(num_angler_trips>0), aes(x=num_angler_trips))+geom_histogram()
+#num_angler_trips = 0 when there are no fish observed that the interviewer could see
+```
+
+fish per angler trip distribution
+
+```{r}
+ggplot(data = tripcatch_2022_zip|>filter(fish_per_angler_trip>0), aes(x=fish_per_angler_trip))+geom_histogram()
+#shows HEAVY skew right, most common value of fish/angler is 0 at the zipcode level
+#max number of fish/angler is about 32
+```
+
+relationship between fish eaten and number of angler trips
+
+```{r}
+ggplot(tripcatch_2022_zip,aes(num_angler_trips,num_claim)) +
+  geom_point(alpha=0.2) +
+  labs(title="Fish caught (CLAIM) vs Number of Angler-Trips")
+```
+
+fish eaten (by CLAIM)
+
+```{r}
+mapview(tripcatch_2022_zip,
+      zcol = 'num_claim',
+          col.regions=brewer.pal(9, "Blues"),
+          alpha.regions = 0.8,
+          layer.name = '# Fish Eaten')
+```
+
+```{r}
+mapview(tripcatch_2022_zip,
+      zcol = 'num_claim_ln',
+          col.regions=brewer.pal(9, "Blues"),
+          alpha.regions = 0.8,
+          layer.name = 'ln # Fish Eaten')
+```
+
+fish eaten per trip
+
+```{r}
+mapview(tripcatch_2022_zip,
+        zcol = 'claim_per_trip',
+          col.regions=brewer.pal(9, "Blues"),
+          alpha.regions = 0.8,
+          layer.name = '# Fish Eaten per Trip')
+```
+
+map of number of per trip per anglers who contributed to CLAIM, ln
+
+```{r}
+mapview(tripcatch_2022_zip,
+      zcol = 'num_angler_trips_ln',
+          col.regions=brewer.pal(9, "Blues"),
+          alpha.regions = 0.8,
+          layer.name = 'Per Angler Per Trip Frequency')
+```
+
+Number of fish per angler trip
+
+```{r}
+mapview(tripcatch_2022_zip,
+      zcol = 'fish_per_angler_trip',
+          col.regions=brewer.pal(9, "Blues"),
+          alpha.regions = 0.8,
+          layer.name = 'Number of Fish per Angler-Trip')
+
+```
+
+fraction of fish eaten (likelihood to consume)
+
+```{r}
+mapview(tripcatch_2022_zip,
+      zcol = 'frac_eaten',
+          col.regions=brewer.pal(9, "Blues"),
+          alpha.regions = 0.8,
+          layer.name = 'claim/total catch')
+
+tmap_leaflet(
+  tm_shape(tripcatch_2022_zip)+tm_polygons(col="frac_eaten",palette="Blues")+
+  tm_shape(cb_access_sf) + tm_symbols(col = "red", size = 0.05))
+
+```
+
+Amt of fish by weight
+
+```{r}
+#sum the weight of each zip code's trip's total fish
+weight_tripcatch <- trip_catch_2022 |>
+  group_by(ID_CODE)|>
+  reframe(weight_claim = sum(wgt_a),
+            num_trip_ids = n(),
+          num_angler_trips=sum(CNTRBTRS),
+    weight_per_angler_per_trip = sum(weight_claim)/sum(CNTRBTRS))#should be 5444 obs
+#note that this is by claim, not landing
+#if we wanted to do landing, we'd have to edit the #cntrbtrs so that it shares values with the LEADER variable, bc cntrbtrs is always 0 for non-claim fish
+
+#aggregate at zip code level
+weight_tripcatch_zip <- trip_catch_2022 |>
+  group_by(ID_CODE,ZIP)|>
+  summarize()|>
+  inner_join(weight_tripcatch,by=c("ID_CODE"="ID_CODE"))|>#to add ZIP variable
+  group_by(ZIP)|>
+  reframe(zip_weight_per_angler_trip = sum(weight_per_angler_per_trip),
+          zip_weight = sum(weight_claim),
+          num_angler_trips = sum(num_angler_trips))
+#join to zip
+weight_tripcatch_zip <- buffer_zip |>
+  left_join(weight_tripcatch_zip,by=c("ZCTA5CE20"="ZIP"))
+#map it
+  mapview(weight_tripcatch_zip,
+        zcol="zip_weight",
+        col.regions=brewer.pal(9, "Blues"),
+          alpha.regions = 0.8,
+          layer.name = 'Fish Weight') 
+#add the other buffer_zip shapefile
+```
+
+Amt of fish in weight per angler-trip
+
+```{r}
+mapview(weight_tripcatch_zip,
+        zcol="zip_weight_per_angler_trip",
+        col.regions=brewer.pal(9, "Blues"),
+          alpha.regions = 0.8,
+          layer.name = 'Weight per angler')
+```
+
+weight distribution
+
+```{r}
+ggplot(data = weight_tripcatch_zip, aes(x=zip_weight))+geom_histogram()
+```
+
+```{r}
+ggplot(weight_tripcatch_zip,aes(zip_weight,num_angler_trips)) +
+  geom_point() +
+  labs(title="Fish weight (CLAIM) vs Number of Trips")
+```
+
+Bivariate mapping (ACS data): show relationship between race/income + fish consumption
+
+load ACS poverty data
+
+```{r}
+load(here('data','intermediate_datasets','acs_economic_cleaner.RData'))
+```
+
+join acs econ data to tripcatch
+
+```{r}
+#acs data has some duplicates, so we're going to remove them
+acs_economic <- acs_economic |>
+  group_by(ZIP)|>
+  reframe(GEO_ID=GEO_ID[1],
+          NAME = NAME[1],
+          unemployment = unemployment[1],
+          pct_pov = pct_pov[1])
+tripcatch_2022_acs <- tripcatch_2022_zip|>
+  inner_join(acs_economic,by=c("ZCTA5CE20"="ZIP")) |>
+  replace("-",NA)
+#need to assign "-" to NA for pct_pov
+tripcatch_2022_acs<- tripcatch_2022_acs|>
+  mutate(unemployment = unemployment |> as.numeric(),
+         pct_pov = pct_pov |> as.numeric())
+```
+
+bivariate package data (biscale)
+
+```{r}
+library(biscale)
+library(cowplot)
+pov_per_angler_trip_data <- bi_class(tripcatch_2022_acs, y=pct_pov,x=frac_eaten,style="jenks",dim=3)
+```
+
+```{r}
+pov_per_angler_trip_map<-ggplot() +
+  geom_sf(data=buffer_zip,
+          fill="White")+
+  geom_sf(data=pov_per_angler_trip_data,
+          mapping=aes(fill=bi_class),
+          show.legend=FALSE)+
+  bi_scale_fill(pal="Bluegill",dim=3)+
+  bi_theme() 
+legend<-bi_legend(pal="Bluegill",
+                  dim=3,
+                  ylab = "% Low Income",
+                  xlab = "Fraction Eaten")
+
+pov_per_angler_trip_plot_zoom <- ggdraw(xlim=c(.4,.7),ylim=c(.5,.8)) +
+  draw_plot(pov_per_angler_trip_map,0,0,1,1)+
+  draw_plot(legend,0.2,.65,.1,.1)
+pov_per_angler_trip_plot <- ggdraw() +
+  draw_plot(pov_per_angler_trip_map,0,0,1,1)+
+  draw_plot(legend,0.2,.65,.2,.2)
+pov_per_angler_trip_plot
+```
+
+```{r}
+unemp_data <- bi_class(tripcatch_2022_acs, y=unemployment,x=frac_eaten,style="jenks",dim=3)
+unemp_map<-ggplot() +
+  geom_sf(data=buffer_zip,
+          fill="White")+
+  geom_sf(data=unemp_data,
+          mapping=aes(fill=bi_class),
+          show.legend=FALSE)+
+  bi_scale_fill(pal="Bluegill",dim=3)+
+  bi_theme() 
+legend<-bi_legend(pal="Bluegill",
+                  dim=3,
+                  ylab = "% Unemployed",
+                  xlab = "Fraction Eaten")
+
+
+unemp_plot <- ggdraw() +
+  draw_plot(unemp_map,0,0,1,1)+
+  draw_plot(legend,0.2,.65,.2,.2)
+unemp_plot
+```
+
+```{r}
+english_data <- bi_class(tripcatch_2022_acs, y=not_english,x=frac_eaten,style="jenks",dim=3)
+english_map<-ggplot() +
+  geom_sf(data=buffer_zip,
+          fill="White")+
+  geom_sf(data=unemp_data,
+          mapping=aes(fill=bi_class),
+          show.legend=FALSE)+
+  bi_scale_fill(pal="Bluegill",dim=3)+
+  bi_theme() 
+legend<-bi_legend(pal="Bluegill",
+                  dim=3,
+                  ylab = "% English Not Spoken at Home",
+                  xlab = "Fraction Eaten")
+
+
+english_plot <- ggdraw() +
+  draw_plot(english_map,0,0,1,1)+
+  draw_plot(legend,0.2,.65,.2,.2)
+english_plot
+```
+
+ggplot ej groups against fish caught
+
+```{r}
+ggplot(tripcatch_2022_acs,aes(pct_pov,frac_eaten)) +
+  geom_point(alpha=0.2) +
+  labs(title="Fraction Eaten vs % Under Poverty Threshold")
+```
+
+same plot but with zips that caught at least 5 fish per angler trip
+
+```{r}
+can_fish <- tripcatch_2022_acs|>
+  filter(fish_per_angler_trip>5)
+ggplot(can_fish,aes(pct_pov,fish_per_angler_trip)) +
+  geom_point() +
+  labs(title="Fish per Angler-Trip vs % Under Poverty Threshold")
+#relationship inverse; so for avid fishers, having more ppl under poverty threshold is a predictor of fish per angler caught
+```
+
+unemployment bivariate map
+
+```{r}
+unemp_data <- bi_class(tripcatch_2022_acs, y=unemployment,x=fish_per_angler_trip,style="jenks",dim=3)
+
+unemp_map<-ggplot() +
+  geom_sf(data=buffer_zip,
+          fill="White")+
+  geom_sf(data=unemp_data,
+          mapping=aes(fill=bi_class),
+          show.legend=FALSE)+
+  bi_scale_fill(pal="Bluegill",dim=3)+
+  bi_theme() 
+legend<-bi_legend(pal="Bluegill",
+                  dim=3,
+                  ylab = "% Unemployed",
+                  xlab = "Fish per Angler")
+
+unemp_per_angler_trip_plot <- ggdraw() +
+  draw_plot(unemp_map,0,0,1,1)+
+  draw_plot(legend,0.2,.65,.2,.2)
+unemp_per_angler_trip_plot
+```
+
+same bivariate maps, but not per angler trip
+
+```{r}
+pov_data<-tripcatch_2022_acs |> select(-unemployment)|>
+  na.omit() # get rid of any NA's that would have come from unemployment
+pov_data <- bi_class(tripcatch_2022_acs, y=pct_pov,x=num_claim,style="jenks",dim=3)
+
+pov_map<-ggplot() +
+  geom_sf(data=buffer_zip,
+          fill="White")+
+  geom_sf(data=pov_data,
+          mapping=aes(fill=bi_class),
+          show.legend=FALSE)+
+  bi_scale_fill(pal="Bluegill",dim=3)+
+  bi_theme() 
+legend<-bi_legend(pal="Bluegill",
+                  dim=3,
+                  ylab = "% Poverty",
+                  xlab = "Fish")
+
+pov_plot <- ggdraw() +
+  draw_plot(pov_map,0,0,1,1)+
+  draw_plot(legend,0.2,.65,.2,.2)
+pov_plot
+```
+
+pov versus fish caught
+
+```{r}
+ggplot(tripcatch_2022_acs,aes(pct_pov,num_claim)) +
+  geom_point() +
+  labs(title="Fish Caught (Claim) vs % Under Poverty Threshold")
+```
+
+```{r}
+all_tripcatch_2022 <- tripcatch_2022_acs |> 
+  st_drop_geometry() %>%
+  inner_join(weight_tripcatch_zip,.,by=c("ZIP"="ZIP"))
+
+ggplot(all_tripcatch_2022,aes(pct_pov,zip_weight)) +
+  geom_point() +
+  labs(title="Weight of Fish Caught (Claim) vs % Under Poverty Threshold")
+```
+
+load acs imm data
+
+```{r}
+load(here('data','intermediate_datasets','acs_imm_cleaner.RData'))
+```
+
+join acs imm data
+
+```{r}
+#acs data has some duplicates, so we're going to remove them
+acs_imm <- acs_imm |>
+  group_by(ZIP)
+tripcatch_2022_acs <- tripcatch_2022_acs|>
+  inner_join(acs_imm,by=c("ZCTA5CE20"="ZIP")) |>
+  replace("-",NA)
+#need to assign "-" to NA for pct_pov
+tripcatch_2022_acs<- tripcatch_2022_acs|>
+  mutate(noncit = noncit |> as.numeric(),
+         not_english = not_english |> as.numeric())
+```
+
+english not spoken at home bivariate map
+
+```{r}
+english_per_angler_trip_data <- bi_class(tripcatch_2022_acs, y=not_english,x=frac_eaten,style="jenks",dim=3)
+
+english_map<-ggplot() +
+  geom_sf(data=buffer_zip,
+          fill="White")+
+  geom_sf(data=english_per_angler_trip_data,
+          mapping=aes(fill=bi_class),
+          show.legend=FALSE)+
+  bi_scale_fill(pal="Bluegill",dim=3)+
+  bi_theme() 
+legend<-bi_legend(pal="Bluegill",
+                  dim=3,
+                  ylab = "% Non-English Speaking Households",
+                  xlab = "% Eaten")
+
+english_per_angler_trip_plot <- ggdraw() +
+  draw_plot(english_map,0,0,1,1)+
+  draw_plot(legend,0.2,.65,.2,.2)
+english_per_angler_trip_plot
+```
+
+```{r}
+ggplot(tripcatch_2022_acs,aes(not_english,fish_per_angler_trip)) +
+  geom_point() +
+  labs(title="Fish Caught per Angler Trip vs % Families who Do Not Speak English at Home")
+```
+
+load acs race data
+
+```{r}
+load(here('data','intermediate_datasets','acs_race_cleaner.RData'))
+```
+
+join acs race data
+
+```{r}
+#acs data has some duplicates, so we're going to remove them
+acs_race <- acs_race |>
+  group_by(ZIP)|>
+  reframe(GEO_ID=GEO_ID[1],
+          black=black[1]|>as.numeric(),
+          white = white[1]|>as.numeric(),
+          asian = asian[1]|>as.numeric(),
+          indigenous = indigenous[1]|>as.numeric(),
+          pac_islander=pac_islander[1]|>as.numeric(),
+          hispanic = hispanic[1]|>as.numeric(),
+          nonwhite=nonwhite[1]|>as.numeric())
+tripcatch_2022_acs <- tripcatch_2022_acs|>
+  inner_join(acs_race,by=c("ZIP"="ZIP")) |>
+  replace("-",NA)
+#need to assign "-" to NA for pct_pov
+
+```
+
+race bivariate plot
+
+```{r}
+race_per_angler_trip_data <- bi_class(tripcatch_2022_acs, y=nonwhite,x=fish_per_angler_trip,style="jenks",dim=3)
+
+race_map<-ggplot() +
+  geom_sf(data=buffer_zip,
+          fill="White")+
+  geom_sf(data=race_per_angler_trip_data,
+          mapping=aes(fill=bi_class),
+          show.legend=FALSE)+
+  bi_scale_fill(pal="Bluegill",dim=3)+
+  bi_theme() 
+legend<-bi_legend(pal="Bluegill",
+                  dim=3,
+                  ylab = "% Nonwhite",
+                  xlab = "Fish per Angler")
+
+race_per_angler_trip_plot <- ggdraw() +
+  draw_plot(race_map,0,0,1,1)+
+  draw_plot(legend,0.2,.65,.2,.2)
+race_per_angler_trip_plot
+```
+
+```{r}
+ggplot(tripcatch_2022_acs,aes(nonwhite,fish_per_angler_trip)) +
+  geom_point() +
+  labs(title="Fish Caught per Angler Trip vs % Nonwhite")
+```
+
+visual of race versus species
+
+```{r}
+#pick top 5 species
+trip_catch_2022 |>
+  group_by(common)|>
+  reframe(num = n())%>%
+  arrange(desc(.$num))|>
+  head()
+```
+
+```{r}
+#wrangle so that there's a number of each of the top species in each zip code
+croaker <- trip_catch_2022 |>
+  filter(common == "ATLANTIC CROAKER")|>
+  group_by(ZIP)|>
+  reframe(num_croaker = sum(CLAIM))
+  
+striped_bass <- trip_catch_2022 |>
+  filter(common == "STRIPED BASS")|>
+  group_by(ZIP)|>
+  reframe(num_stripedbass = sum(CLAIM))
+  
+spot <- trip_catch_2022 |>
+  filter(common == "SPOT")|>
+  group_by(ZIP)|>
+  reframe(num_spot = sum(CLAIM))
+  
+bs_bass <- trip_catch_2022 |>
+  filter(common == "BLACK SEA BASS")|>
+  group_by(ZIP)|>
+  reframe(num_bsbass = sum(CLAIM))
+  
+tripcatch_2022_acs <-
+  tripcatch_2022_acs |>
+  left_join(croaker, by=c("ZIP"="ZIP"))|>
+  left_join(striped_bass, by=c("ZIP"="ZIP"))|>
+  left_join(spot,by=c("ZIP"="ZIP"))|>
+  left_join(bs_bass,by=c("ZIP"="ZIP"))
+```
+
+```{r}
+#| warning: false
+croaker_bw <- ggplot(tripcatch_2022_acs) +
+         geom_point(aes(x=black,y=num_croaker),colour = "red",alpha=0.5)+
+         geom_point(aes(x=white,y=num_croaker),colour = "blue",alpha=0.5)+
+  labs(title="Number of Croakers Eaten vs Percent Race")
+
+striped_bass_bw <- ggplot(tripcatch_2022_acs) +
+         geom_point(aes(x=black,y=num_stripedbass),colour = "red",alpha=0.5)+
+         geom_point(aes(x=white,y=num_stripedbass),colour = "blue",alpha=0.5)+
+  labs(title="Number of Striped Bass Eaten vs Percent Race")
+
+spot_bw <- ggplot(tripcatch_2022_acs) +
+         geom_point(aes(x=black,y=num_spot),colour = "red",alpha=0.5)+
+         geom_point(aes(x=white,y=num_spot),colour = "blue",alpha=0.5)+
+  labs(title="Number of Spot Eaten vs Percent Race")
+
+bs_bass_bw <- ggplot(tripcatch_2022_acs) +
+         geom_point(aes(x=black,y=num_bsbass),colour = "purple")+
+         geom_point(aes(x=white,y=num_bsbass),colour = "blue")+
+  labs(title="Number of Croakers Eaten vs Percent Race")
+
+library(patchwork)
+croaker_bw/striped_bass_bw/spot_bw
+```

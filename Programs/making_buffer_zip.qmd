@@ -1,0 +1,99 @@
+---
+title: "make_buffer_zip"
+format: html
+editor: visual
+---
+
+## 
+
+This document will make an sf object that includes all zip codes within a 100 mile radius of the nearest sitepoint, called buffer_zip. Also creates active_sites, an sf that contains all active CB fishing sites. Also makes a map of all fishing zip codes that send fishers to the Chesapeake overlaid with the buffer_zip zips and the Chesapeake Bay watershed boundary, for context of what zip codes are being filtered into the dataset. For more see izzy_zheng_readme.txt.
+
+Setup
+
+```{r}
+library(here)
+library(tidyverse)
+library(sf)
+library(tmap)
+library(leaflet)
+```
+
+load data
+
+```{r}
+data_path <- here('data') #relative path to the data folder
+zip <- st_read(here(data_path, 'zipcodes', 'tl_2020_us_zcta520.shp')) #zip code shapefiles originally taken from https://www2.census.gov/geo/tiger/TIGER2020/ZCTA520/
+zip<- zip |> select(-CLASSFP20,-MTFCC20,-FUNCSTAT20,-ALAND20,-AWATER20)
+access_df <- read.csv(here('data', 'NOAA MRF', 'Public Fishing Access Site Register', 'SITE.csv'))
+cb_sf <- st_read(here(data_path, 'watershed boundary', 'Chesapeake_Bay_Watershed_Boundary.shp')) #Chesapeake Bay shapefile
+load(here('data','intermediate_datasets','trip_catch_2022.RData'))
+```
+
+```{r}
+cb_sf <- cb_sf|> st_transform(st_crs(zip)) 
+```
+
+filter sites to active and within the CB border.
+
+```{r}
+cb_access_sf <- access_df %>%
+  rename_all(tolower) %>%
+    filter(status == 'Active') |>
+  st_as_sf(coords = c(x = 'site_long',
+             y = 'site_lat'),
+             crs = 4326) %>%
+ st_transform(st_crs(zip)) |>
+    st_filter(cb_sf)
+save(cb_access_sf,file=here(data_path,"intermediate_datasets","active_sites.Rdata"))
+```
+
+add 100-mi buffers
+
+```{r}
+site_buffer <- st_buffer(cb_access_sf,dist = 160934.4) #meter conversion of 100 miles
+#visualization:
+tmap_leaflet(tm_shape(site_buffer) +
+  tm_polygons(alpha=0)+
+  tm_symbols(col = "red", size = 0.1))
+```
+
+filter to zip codes within buffers
+
+```{r}
+zip |>
+  st_transform(st_crs(cb_sf)) 
+buffer_zip <- st_filter(zip,site_buffer)
+```
+
+```{r}
+save(buffer_zip,file=here(data_path,"intermediate_datasets","buffer_zip.Rdata"))
+```
+
+Visual of chesapeake bay, fishing zips
+
+orange = CB boundary
+
+blue=fishing zips
+
+red = mapped zip codes
+
+```{r}
+fishing_zips <- trip_catch_2022 |>
+  group_by(ZIP)|>
+  reframe(fishing = TRUE)
+fishing_zips <- zip |>
+  inner_join(fishing_zips,by=c('ZCTA5CE20'='ZIP'))
+tmap_leaflet(
+  tm_shape(buffer_zip)+tm_polygons(col="red",alpha=0.8)+
+  tm_shape(fishing_zips)+tm_polygons(col='blue',alpha=0.8)+
+    tm_shape(cb_sf)+tm_polygons(border.col='orange',alpha=0))
+```
+
+```{r}
+
+tmap_leaflet(
+  tm_shape(buffer_zip)+tm_polygons(col="grey",alpha=0.8)+
+  tm_shape(fishing_zips)+tm_polygons(col='blue',alpha=0.8)+
+  tm_shape(site_buffer) + tm_symbols(col = "red", size = 0.1)) |> 
+  setView(lat=38.5,lng=-77,zoom = 6.4) 
+```

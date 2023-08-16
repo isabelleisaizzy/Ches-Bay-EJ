@@ -1,0 +1,27 @@
+---
+title: "correlation_tables"
+format: html
+editor: visual
+---
+
+Makes correlation tables on EJ variables on trip_catch_2022_piv_acs.RData, from making_trip_catch_2022_piv_acs.RData. For more see izzy_zheng_readme.txt.
+
+```{r}
+#| warning: false
+library(tidyverse)
+library(here)
+library(corrplot)
+data_path <- here('data')
+load(here('data','intermediate_datasets',"trip_catch_2022_piv_acs.RData"))
+percent_eaten_reg_data <- trip_catch_2022_piv_acs |>
+  filter(tot_cat_1 >0)|>
+  select(unemployment,income,not_english,black,nonwhite,
+         mode_reg,hrsf,age,ffdays2,cntrbtrs,gender,wave,
+         intsite,percent_eaten, st_res,wp_int,desired_fish)|>
+  na.omit()
+```
+
+```{r}
+source("http://www.sthda.com/upload/rquery_cormat.r")
+rquery.cormat(dep_indep)
+```

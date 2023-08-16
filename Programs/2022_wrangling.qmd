@@ -1,0 +1,291 @@
+---
+title: "2022_visualizations"
+format: html
+editor: visual
+---
+
+## 
+
+Setup
+
+```{r}
+library(tidyverse)
+library(here)
+library(readr)
+library(sf)
+library(mapview)
+library(RColorBrewer)
+```
+
+```{r}
+#load data
+data_path <- here('data') #relative path to the data folder
+```
+
+load data. These datasets were made in the making_intermediate_datasets file in "Programs".
+
+```{r}
+load(here('data','intermediate_datasets','cb_zip.RData'))
+load(here('data','intermediate_datasets','manual_zip.RData'))
+load(here('data','intermediate_datasets','trip_catch_2022.RData'))
+```
+
+Visualizations
+
+group by zip code
+
+```{r}
+tripcatch_2022_zip <- trip_catch_2022 |>
+  group_by(ZIP)|>
+  reframe(num_eaten = sum(landing),
+          num_angler_trips = ID_CODE|>length())|>
+  mutate(fish_per_angler_trip=num_eaten/num_angler_trips)
+#represents fish per person per trip
+```
+
+join zip and tripcatch together
+
+```{r}
+tripcatch_2022_zip <- zip_manual |> 
+  left_join(tripcatch_2022_zip,by=c("ZIP"="ZIP"))
+
+#if we do a right join with zip, you'll get all the zip codes but no relative knowledge of where they are
+```
+
+view map
+
+```{r}
+mapview(tripcatch_2022_zip,
+      zcol = 'num_eaten',
+          col.regions=brewer.pal(9, "Blues"),
+          alpha.regions = 0.8,
+          layer.name = '# Fish Eaten')
+```
+
+is the variation from one superfisher or a sizable community of fishers? i think this codeblock is useless but keeping it
+
+```{r}
+#get vector of cb zip codes w 20+ fish/angler
+many_fish_zip <- tripcatch_2022_zip_joined |>
+  filter(fish_per_angler > 20)|>
+  st_drop_geometry()|>
+  select(ZIP)
+
+#join to catch_2022 to look at harvest per fisher
+many_fish_zip <- many_fish_zip |>
+  left_join(tripcatch_2022_zip,by=c("ZIP"="ZIP"))
+
+#visualization: ideally some visualization of number of fishermen in each zip code. x axis num fisherman, y axis number of zip codes
+ggplot(data = many_fish_zip, aes(x=num_anglers))+geom_histogram()
+#shows that the zip codes w 20+ fish/trip have 1 or 2 trips in them; so super dark areas are not nec places where lots of fish consumption is happening
+#a better indicator might be total fish/population, or total fish, or filtering to areas that have at least 3 anglers in them
+#avg num anglers=7, median anglers = 3
+```
+
+```{r}
+#more data visualizations
+ggplot(data = tripcatch_2022_zip, aes(x=fish_per_angler_trip))+geom_histogram()
+#shows HEAVY skew right, most common value of fish/angler is 0 at the zipcode level
+#max number of fish/angler is about 32
+```
+
+map of number of trips
+
+```{r}
+mapview(tripcatch_2022_zip,
+      zcol = 'num_anglers',
+          col.regions=brewer.pal(9, "Blues"),
+          alpha.regions = 0.8,
+          layer.name = 'Per Angler Per Trip Frequency')
+```
+
+Amt of fish by weight
+
+```{r}
+#sum the weight of each zip code's trip's total fish
+weight_tripcatch <- trip_catch_2022 |>
+  group_by(ID_CODE)|>
+  summarize(weight_claim = sum(wgt_a),
+    weight_per_angler_per_trip = sum(wgt_a)/sum(CNTRBTRS))#should be 5444 obs
+#note that this is by claim, not landing
+#if we wanted to do landing, we'd have to edit the #cntrbtrs so that it shares values with the LEADER variable
+
+#aggregate at zip code level
+weight_tripcatch_zip <- trip_catch_2022 |>
+  group_by(ID_CODE,ZIP)|>
+  summarize()|>
+  inner_join(weight_tripcatch,by=c("ID_CODE"="ID_CODE"))|>#to add ZIP variable
+  group_by(ZIP)|>
+  reframe(zip_weight_per_angler_trip = sum(weight_per_angler_per_trip),
+          zip_weight = sum(weight_claim))
+#join to zip
+weight_tripcatch_zip <- zip_manual |>
+  left_join(weight_tripcatch_zip,by=c("ZIP"="ZIP"))
+#map it
+  mapview(weight_tripcatch_zip,
+        zcol="zip_weight",
+        col.regions=brewer.pal(9, "Blues"),
+          alpha.regions = 0.8,
+          layer.name = 'Fish Weight') 
+#add the other zip_manual shapefile
+```
+
+Amt of fish in weight per angler
+
+```{r}
+mapview(weight_tripcatch_zip,
+        zcol="zip_weight_per_angler_trip",
+        col.regions=brewer.pal(9, "Blues"),
+          alpha.regions = 0.8,
+          layer.name = 'Weight per angler')
+```
+
+Bivariate mapping (ACS data): show relationship between race/income + fish consumption
+
+```{r}
+
+```
+
+bivariate mapping data wrangling: join acs data in block group format to trip catch in zip format
+
+```{r}
+#clean acs data for joining (thanks peiley!)
+cb_acs_df_clean <- cb_acs_df %>%
+    st_drop_geometry() %>%
+    pivot_wider(names_from=variable,values_from=estimate) %>%
+    mutate(
+           #compute percent below poverty threshold -->
+      # pov50 (# below 0.5) and pov 99 (# between 0.5 and 0.99)
+           pov99=(pov99+pov50)/pop*100,
+           pov50=pov50/pop*100,
+           income=income,
+           state = substr(GEOID, 1, 2))
+
+#convert acs to zipcode level using bg_zip
+zip_acs <- cb_acs_df_clean |>
+  inner_join(bg_zip,by=c("GEOID"="GEOID_bg")) |>
+  group_by(ZIP_final)|>
+  reframe(pct_minority = (sum(black)+sum(indian)+sum(asian)+sum(hispanic))/sum(pop),
+          pct_black = sum(black)/sum(pop),
+          pct_50=sum(pov50)/sum(pop),#percent of ppl under half the fed poverty income threshold
+          pct_100=(sum(pov50)+sum(pov99))/sum(pop),
+          pct_indian = sum(indian)/sum(pop),
+          pct_hispanic = sum(hispanic)/sum(pop),
+          pct_asian=sum(asian)/sum(pop))#pct ppl under fed pov income threshold
+
+#join with tripcatch by zip code
+tripcatch_2022_acs <- tripcatch_2022_zip|>
+  inner_join(zip_acs,by=c("ZIP"="ZIP_final"))
+```
+
+bivariate package data (biscale)
+
+note: am confused about the breaks thing: equal vs quantile vs jenks vs fisher?
+
+```{r}
+library(biscale)
+library(cowplot)
+biv_data<-tripcatch_2022_acs |> select(-pct_minority,-pct_black)|>
+  na.omit()
+biv_data <- bi_class(biv_data, y=pct_100,x=fish_per_angler_trip,style="jenks",dim=3)
+```
+
+```{r}
+map<-ggplot() +
+  geom_sf(data=zip_manual,
+          fill="White")+
+  geom_sf(data=biv_data,
+          mapping=aes(fill=bi_class),
+          show.legend=FALSE)+
+  bi_scale_fill(pal="Bluegill",dim=3)+
+  bi_theme() 
+legend<-bi_legend(pal="Bluegill",
+                  dim=3,
+                  ylab = "% Low Income",
+                  xlab = "Fish per Angler")
+
+final_plot <- ggdraw() +
+  draw_plot(map,0,0,1,1)+
+  draw_plot(legend,0.2,.65,.2,.2)
+final_plot
+```
+
+same map but for % black
+
+```{r}
+black_data<-tripcatch_2022_acs |> select(-pct_minority,-pct_100)|>
+  na.omit()
+black_data <- bi_class(black_data, x=fish_per_angler,y=pct_black,style="jenks",dim=3)
+
+map_black <-ggplot() +
+  geom_sf(data=cb_zip,
+          fill="White")+
+  geom_sf(data=black_data,
+          mapping=aes(fill=bi_class),
+          show.legend=FALSE)+
+  bi_scale_fill(pal="Bluegill",dim=3)+
+  bi_theme() 
+legend<-bi_legend(pal="Bluegill",
+                  dim=3,
+                  xlab = "Fish per Angler",
+                  ylab = "% Black")
+
+black_plot <- ggdraw() +
+  draw_plot(map,0,0,1,1)+
+  draw_plot(legend,0.2,.65,.2,.2)
+black_plot
+```
+
+same map but with minorities
+
+```{r}
+minority_data<-tripcatch_2022_acs |> select(-pct_black,-pct_100)|>
+  na.omit()
+minority_data <- bi_class(minority_data, x=fish_per_angler,y=pct_minority,style="jenks",dim=3)
+
+map_black <-ggplot() +
+  geom_sf(data=cb_zip,
+          fill="White")+
+  geom_sf(data=minority_data,
+          mapping=aes(fill=bi_class),
+          show.legend=FALSE)+
+  bi_scale_fill(pal="Bluegill",dim=3)+
+  bi_theme() 
+legend<-bi_legend(pal="Bluegill",
+                  dim=3,
+                  xlab = "Fish per Angler",
+                  ylab = "% Minority")
+
+minority_plot <- ggdraw() +
+  draw_plot(map,0,0,1,1)+
+  draw_plot(legend,0.2,.65,.2,.2)
+minority_plot
+```
+
+ggplot ej groups against fish caught
+
+```{r}
+ggplot(tripcatch_2022_acs,aes(pct_100,fish_per_angler)) +
+  geom_point() +
+  labs(title="Fish per Angler vs % Under Poverty Threshold")
+#shows vast majority of fishing zip codes get no fish and have no poor people
+#loose negative correlation btwn fish/angler and percent under the pov threshold
+```
+
+ggplot with % black
+
+```{r}
+ggplot(tripcatch_2022_acs,aes(pct_black,fish_per_angler)) +
+  geom_point() +
+  labs(title="Fish per Angler vs % Black")
+#shows vast majority of fishing zip codes get no fish and have some black people
+#again, loose negative correlation btwn fish/angler and %black
+```
+
+```{r}
+ggplot(tripcatch_2022_acs,aes(pct_minority,fish_per_angler)) +
+  geom_point() +
+  labs(title="Fish per Angler vs % Minority")
+#shows vast majority of fishing zip codes get no fish and have decent percentage minorities
+#again, loose negative correlation btwn fish/angler and % minority, but way less than before; implies nonblack minorities more likely to fish than blacks?
+```
