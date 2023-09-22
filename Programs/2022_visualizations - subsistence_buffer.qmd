@@ -15,6 +15,7 @@ library(readr)
 library(sf)
 library(mapview)
 library(RColorBrewer)
+library(tmap)
 ```
 
 ```{r}
@@ -28,6 +29,7 @@ load data. These datasets were made in the making_intermediate_datasets file in 
 load(here('data','intermediate_datasets','buffer_zip.RData'))
 load(here('data','intermediate_datasets','trip_catch_2022.RData'))
 load(here('data',"intermediate_datasets","active_sites.Rdata"))
+
 ```
 
 Visualizations
@@ -83,6 +85,29 @@ tripcatch_2022_zip <- buffer_zip |>
   left_join(tripcatch_2022_zip,by=c("ZCTA5CE20"="ZIP"))
 
 #if we do a right join with zip, you'll get all the zip codes but no relative knowledge of where they are
+```
+
+```{r}
+tmap_leaflet(
+  tm_shape(tripcatch_2022_zip)+tm_polygons(col= "num_id_codes",palette = "Blues")+
+  tm_shape(cb_access_sf) + tm_symbols(col = "red", size = 0.05))
+
+```
+
+map of number of observations per zip code
+
+```{r}
+tmap_leaflet(
+  tm_shape(tripcatch_2022_zip)+tm_polygons(col= "num_trips",palette = "Blues")+
+  tm_shape(cb_access_sf) + tm_symbols(col = "red", size = 0.05))
+```
+
+```{r}
+ggplot(data = tripcatch_2022_zip, aes(x=num_id_codes))+geom_histogram()
+```
+
+```{r}
+ggplot(data = tripcatch_2022_zip, aes(x=num_trips))+geom_histogram()
 ```
 
 summary distribution type visualizations
