@@ -83,6 +83,7 @@ tripcatch_2022_zip <- buffer_zip |>
   left_join(tripcatch_2022_zip,by=c("ZCTA5CE20"="ZIP"))
 
 #if we do a right join with zip, you'll get all the zip codes but no relative knowledge of where they are
+save(tripcatch_2022_zip,file=here(data_path,"intermediate_datasets","trip_catch_2022_zip.RData")) #zip code level data
 ```
 
 summary distribution type visualizations

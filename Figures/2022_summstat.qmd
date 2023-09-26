@@ -15,6 +15,7 @@ library(here)
 library(psych)
 data_path <- here('data')
 load(here('data','intermediate_datasets',"trip_catch_2022_piv_acs.RData"))
+load(here('data',"intermediate_datasets","tripcatch_2022_zip.Rdata"))
 percent_eaten_reg_data <- trip_catch_2022_piv_acs |>
   filter(tot_cat_1 >0)|>
   select(unemployment,income,not_english,black,nonwhite,

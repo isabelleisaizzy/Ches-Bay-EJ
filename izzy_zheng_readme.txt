@@ -18,9 +18,9 @@ Inputs: NOAA APAIS survey data - all catch.csv and trip.csv files in data > NOAA
 Use in other files: trip_catch_2022 used in 2022_visualizations - subsistence_buffer.qmd (Ches Bay EJ > Programs)
 
 3. 2022_visualizations - subsistence_buffer.qmd (Ches Bay EJ > Programs)
-Function: Wrangles trip_catch_2022 into a zip code level dataset. Makes maps and graphs of number of claim, percentage eaten of total catch, total weight, number of trips. Also creates some bivariate maps that show percentage of families who speak a non-English language at home against percentage eaten of total catch. 
+Function: Wrangles trip_catch_2022 into a zip code level dataset and saves it as tripcatch_2022_zip.RData. Makes maps and graphs of number of claim, percentage eaten of total catch, total weight, number of trips. Also creates some bivariate maps that show percentage of families who speak a non-English language at home against percentage eaten of total catch. 
 Inputs: trip_catch_2022 from making_trip_catch_2022.qmd, buffer_zip from making_buffer_zip.qmd, active_sites from making_buffer_zip.qmd, 
-Use in other files: None
+Use in other files: tripcatch_2022_zip used in 2022_summ_stat.qmd
 
 4. making_trip_catch_2022_piv_acs.qmd (Ches Bay EJ > Programs)
 Function: Creates acs_economic_cleaner, acs_imm_cleaner, and acs_race_cleaner, which are the cleaned zip code level ACS variable datasets. Creates trip_catch_2022_piv_acs, which is for running regressions. trip_catch_2022_piv_acs is made by pivoting the trip_catch_2022 data to be at trip ID level, meaning 1 observation per interview (which can correspond to multiple fishermen). It is then joined with the cleaned ACS datasets. The finished dataset trip_catch_2022_piv_acs is trip-level data that has ACS EJ variables.  
