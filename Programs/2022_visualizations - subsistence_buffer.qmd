@@ -78,7 +78,7 @@ tripcatch_2022_zip <- trip_catch_2022 |> #recall this is at the id code and spec
 
 join zip and tripcatch together
 
-filter to zip codes that went on at least 10 trips per year (based off [this one paper](https://www.sciencedirect.com/science/article/pii/S0308597X20304863?casa_token=hYS1-DN8O84AAAAA:tZPPPT_9FTJYyDb41PEGLioR3lhHdM5gCxKxBYpx_u-1kxwXc11hKzoLmRwDtobw1lND8DjJ#sec4)'s study of Santa Barbara subsistence fishers, where 82% of fishers fished 1x/month or more. would be good to do a broader literature review to confirm this is a good number). the num_eaten si pretty arbitrary, based off the fish histogram distribution
+could filter to zip codes that went on at least 10 trips per year (based off [this one paper](https://www.sciencedirect.com/science/article/pii/S0308597X20304863?casa_token=hYS1-DN8O84AAAAA:tZPPPT_9FTJYyDb41PEGLioR3lhHdM5gCxKxBYpx_u-1kxwXc11hKzoLmRwDtobw1lND8DjJ#sec4)'s study of Santa Barbara subsistence fishers, where 82% of fishers fished 1x/month or more. would be good to do a broader literature review to confirm this is a good number). the num_eaten si pretty arbitrary, based off the fish histogram distribution
 
 ```{r}
 tripcatch_2022_zip <- buffer_zip |> 
@@ -102,9 +102,13 @@ tmap_leaflet(
   tm_shape(cb_access_sf) + tm_symbols(col = "red", size = 0.05))
 ```
 
+number of observations per zip
+
 ```{r}
 ggplot(data = tripcatch_2022_zip, aes(x=num_id_codes))+geom_histogram()
 ```
+
+number of trips per zip represented by data
 
 ```{r}
 ggplot(data = tripcatch_2022_zip, aes(x=num_trips))+geom_histogram()
