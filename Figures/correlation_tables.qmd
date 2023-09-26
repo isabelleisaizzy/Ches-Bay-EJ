@@ -14,14 +14,15 @@ library(corrplot)
 data_path <- here('data')
 load(here('data','intermediate_datasets',"trip_catch_2022_piv_acs.RData"))
 percent_eaten_reg_data <- trip_catch_2022_piv_acs |>
-  filter(tot_cat_1 >0)|>
+  filter(tot_cat_1 >0)|> #there's at least 1 fish caught in the given trip
   select(unemployment,income,not_english,black,nonwhite,
-         mode_reg,hrsf,age,ffdays2,cntrbtrs,gender,wave,
-         intsite,percent_eaten, st_res,wp_int,desired_fish)|>
+         age,cntrbtrs,gender,
+         percent_eaten,desired_fish,bad_english, noncit,
+         asian, hispanic)|>
   na.omit()
 ```
 
 ```{r}
 source("http://www.sthda.com/upload/rquery_cormat.r")
-rquery.cormat(dep_indep)
+rquery.cormat(percent_eaten_reg_data)
 ```

@@ -519,10 +519,10 @@ acs_race <- acs_race |>
           hispanic = hispanic[1]|>as.numeric(),
           nonwhite=nonwhite[1]|>as.numeric())
 tripcatch_2022_acs <- tripcatch_2022_acs|>
-  inner_join(acs_race,by=c("ZIP"="ZIP")) |>
+  inner_join(acs_race,by=c("ZCTA5CE20"="ZIP")) |>
   replace("-",NA)
 #need to assign "-" to NA for pct_pov
-
+save(tripcatch_2022_acs,file=here(data_path,"intermediate_datasets","tripcatch_2022_acs.RData")) #zip code level data
 ```
 
 race bivariate plot
