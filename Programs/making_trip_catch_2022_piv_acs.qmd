@@ -53,11 +53,13 @@ acs_imm <- read.csv(here('data', 'acs_data', 'acs_imm','ACSDP5Y2021.DP02-Data.cs
 acs_imm <- acs_imm|>
   mutate(noncit = DP02_0097PE|>as.numeric(),
          not_english = DP02_0114PE|>as.numeric(), #primary lang at home is not English
-         bad_english = DP02_0015PE|>as.numeric(), #their english isn't good and prim lang at home is not english
+         bad_english = DP02_0115PE|>as.numeric(), #their english isn't good and prim lang at home is not english
+         foreign_born = DP02_0094PE |>as.numeric(), #percent foreign born
          college = DP02_0068PE|>as.numeric()) |> #pct college educated or more 
   select(noncit,
          not_english,
          bad_english,
+         foreign_born,
          college,
          GEO_ID)|> #percentage of families and people with income over the last year under the federal poverty level 
   mutate(ZIP=GEO_ID|>str_sub(-5))

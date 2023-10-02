@@ -270,19 +270,8 @@ join acs econ data to tripcatch
 
 ```{r}
 #acs data has some duplicates, so we're going to remove them
-acs_economic <- acs_economic |>
-  group_by(ZIP)|>
-  reframe(GEO_ID=GEO_ID[1],
-          NAME = NAME[1],
-          unemployment = unemployment[1],
-          pct_pov = pct_pov[1])
 tripcatch_2022_acs <- tripcatch_2022_zip|>
-  inner_join(acs_economic,by=c("ZCTA5CE20"="ZIP")) |>
-  replace("-",NA)
-#need to assign "-" to NA for pct_pov
-tripcatch_2022_acs<- tripcatch_2022_acs|>
-  mutate(unemployment = unemployment |> as.numeric(),
-         pct_pov = pct_pov |> as.numeric())
+  inner_join(acs_economic,by=c("ZCTA5CE20"="ZIP")) 
 ```
 
 bivariate package data (biscale)
@@ -456,16 +445,8 @@ load(here('data','intermediate_datasets','acs_imm_cleaner.RData'))
 join acs imm data
 
 ```{r}
-#acs data has some duplicates, so we're going to remove them
-acs_imm <- acs_imm |>
-  group_by(ZIP)
 tripcatch_2022_acs <- tripcatch_2022_acs|>
-  inner_join(acs_imm,by=c("ZCTA5CE20"="ZIP")) |>
-  replace("-",NA)
-#need to assign "-" to NA for pct_pov
-tripcatch_2022_acs<- tripcatch_2022_acs|>
-  mutate(noncit = noncit |> as.numeric(),
-         not_english = not_english |> as.numeric())
+  inner_join(acs_imm,by=c("ZCTA5CE20"="ZIP")) 
 ```
 
 english not spoken at home bivariate map
@@ -507,21 +488,8 @@ load(here('data','intermediate_datasets','acs_race_cleaner.RData'))
 join acs race data
 
 ```{r}
-#acs data has some duplicates, so we're going to remove them
-acs_race <- acs_race |>
-  group_by(ZIP)|>
-  reframe(GEO_ID=GEO_ID[1],
-          black=black[1]|>as.numeric(),
-          white = white[1]|>as.numeric(),
-          asian = asian[1]|>as.numeric(),
-          indigenous = indigenous[1]|>as.numeric(),
-          pac_islander=pac_islander[1]|>as.numeric(),
-          hispanic = hispanic[1]|>as.numeric(),
-          nonwhite=nonwhite[1]|>as.numeric())
 tripcatch_2022_acs <- tripcatch_2022_acs|>
-  inner_join(acs_race,by=c("ZCTA5CE20"="ZIP")) |>
-  replace("-",NA)
-#need to assign "-" to NA for pct_pov
+  inner_join(acs_race,by=c("ZCTA5CE20"="ZIP")) 
 save(tripcatch_2022_acs,file=here(data_path,"intermediate_datasets","tripcatch_2022_acs.RData")) #zip code level data
 ```
 
