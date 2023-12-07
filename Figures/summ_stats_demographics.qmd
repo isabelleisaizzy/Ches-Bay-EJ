@@ -1,0 +1,199 @@
+---
+title: "summ_stats_demographics"
+format: html
+editor: visual
+---
+
+```{r}
+#| warning: false
+library(tidyverse)
+library(here)
+library(psych)
+library(corrplot)
+data_path <- here('data')
+load(here('data','intermediate_datasets',"trip_catch_2022_piv_acs.RData"))
+load(here('data','intermediate_datasets',"tripcatch_2022_acs.RData"))
+
+```
+
+Demographic Summary Statistics: trip ID level
+
+```{r}
+demog_tripid <-trip_catch_2022_piv_acs |>
+  filter(tot_cat_1>0)|>
+  select(
+         unemployment,pct_pov,income,college, #richness
+         noncit,not_english,bad_english,foreign_born,#immigrant
+         black,nonwhite,white,asian,#race/eth
+         indigenous,pac_islander,hispanic,nonwhite, #race/eth
+         dne_total, polluted_proportion,water_body,num_ramps #outcome vars
+         ) |>
+  na.omit()
+demog_tripid_summstat <- describe(demog_tripid,fast=TRUE)
+```
+
+correlation tables (not shown atm because demog_tripid contains string variables)
+
+```{r}
+#source("http://www.sthda.com/upload/rquery_cormat.r")
+#rquery.cormat(demog_tripid)
+```
+
+demographic summary statistics: zip code level
+
+```{r}
+#demog_zip <-tripcatch_2022_acs |>
+#  st_drop_geometry()|>
+#  select(
+#         unemployment,pct_pov,income,college, #richness
+#         noncit,not_english,bad_english,foreign_born,#immigrant
+#         black,nonwhite,white,asian,#race/eth
+#         indigenous,pac_islander,hispanic,nonwhite #race/eth
+#         )
+#demog_zip_summstat <- describe(demog_zip,fast=TRUE)
+#demog_zip_summstat
+```
+
+distribution of foreign born by zip:
+
+```{r}
+#ggplot(data = tripcatch_2022_acs, aes(x=foreign_born))+geom_histogram()
+```
+
+correlation tables
+
+```{r}
+#source("http://www.sthda.com/upload/rquery_cormat.r")
+#rquery.cormat(demog_zip)
+```
+
+generate percentile dummies for ejs
+
+```{r}
+quantile(demog_tripid$income,probs=c(0.25,0.5,0.75,1))
+quantile(demog_tripid$black,probs=c(0.25,0.5,0.75,1))
+quantile(demog_tripid$not_english,probs=c(0.25,0.5,0.75,1))
+quantile(demog_tripid$polluted_proportion,probs=c(0.35,0.7,1))
+#shows that prolprop is 0 up to 80th percentile
+demog_tripid<- demog_tripid |>
+  mutate(income_quant = case_when(
+    income < quantile(demog_tripid$income,0.25) ~ "0-25%",
+    between(income,quantile(demog_tripid$income,0.25),quantile(demog_tripid$income,0.5)) ~ "25-50%",
+    between(income,quantile(demog_tripid$income,0.5),quantile(demog_tripid$income,0.75)) ~ "50-75%",
+    income > quantile(demog_tripid$income,0.75) ~ "75-100%",
+  ),
+  black_quant = case_when(
+    black < quantile(demog_tripid$black,0.25) ~ "0-25%",
+    between(black,quantile(demog_tripid$black,0.25),quantile(demog_tripid$black,0.5)) ~ "25-50%",
+    between(black,quantile(demog_tripid$black,0.5),quantile(demog_tripid$black,0.75)) ~ "50-75%",
+    black > quantile(demog_tripid$black,0.75) ~ "75-100%",
+  ),
+  ne_quant = case_when(
+    not_english < quantile(demog_tripid$not_english,0.25) ~ "0-25%",
+    between(not_english,quantile(demog_tripid$not_english,0.25),quantile(demog_tripid$not_english,0.5)) ~ "25-50%",
+    between(not_english,quantile(demog_tripid$not_english,0.5),quantile(demog_tripid$not_english,0.75)) ~ "50-75%",
+    not_english > quantile(demog_tripid$not_english,0.75) ~ "75-100%"
+  ),
+  nonwhite_quant = case_when(
+    nonwhite < quantile(demog_tripid$nonwhite,0.25) ~ "0-25%",
+    between(nonwhite,quantile(demog_tripid$nonwhite,0.25),quantile(demog_tripid$nonwhite,0.5)) ~ "25-50%",
+    between(nonwhite,quantile(demog_tripid$nonwhite,0.5),quantile(demog_tripid$nonwhite,0.75)) ~ "50-75%",
+    nonwhite > quantile(demog_tripid$nonwhite,0.75) ~ "75-100%"
+  ),
+  polprop_quant = case_when(
+    polluted_proportion==0 ~ "equal to 0, ~bottom 70%",
+    TRUE ~ "greater than 0%"
+  ))
+#inspect<-demog_tripid|>
+  #select(polluted_proportion,polprop_quant)|>
+  #unique()
+demog_tripid <-demog_tripid |>
+  mutate(dne_str = as.character(dne_total))
+```
+
+generate quantile dummies for dependents
+
+```{r}
+quantile(demog_tripid$dne_total,probs=c(0.25,0.5,0.75,1))
+quantile(demog_tripid$polluted_proportion,probs=c(0.25,0.5,0.75,1))
+```
+
+Income
+
+```{r}
+#dne
+ggplot(data = demog_tripid, aes(x=income, y=dne_total))+geom_point(alpha=0.2,position="jitter")
+ggplot(demog_tripid, aes(x=dne_total, fill=income_quant)) +geom_bar(position="fill")
+ggplot(demog_tripid, aes(x = income, y = dne_str)) +  geom_violin() + theme_minimal()
+#polprop
+ggplot(data = demog_tripid, aes(x=income, y=polluted_proportion))+geom_point(alpha=0.2,position="jitter")
+ggplot(demog_tripid, aes(x=polprop_quant, fill=income_quant)) +geom_bar(position="fill")
+ggplot(demog_tripid, aes(x = income, y = polprop_quant)) +  geom_violin() + theme_minimal()
+```
+
+Income Summstat Comments: Based on the DNE scatterplot, it seems like you're always more likely to not be eating polluted fish regardless of your income, but as income exceeds \~130K, your likelihood of eating polluted fish goes up. This could indicate what we were talking about earlier, where super high income fishermen perhaps go for extra big and thus polluted fish. It could also be an outlier problem (I'm not sure if R scatterplots have 1 point represent 1 observation?); there are only about3 observations that eat polluted fish that come from zip codes with average incomes \>175K.
+
+The stacked barplots show income distribution for people who do not eat fish with advisories and people who do. As would be expected, the people in the bottom 0-25% of the income distribution are overrepresented in the population who eat fish with advisories. However, the top 50% of the income distribution represents half of the population in both fishers who eat fish with advisories and fish who don't.
+
+The violin plots show that for people with advisories, the distribution gets skinnier later, indicating that people with zip code incomes \~150K are more represented in the eating polluted fish population than in the not eating polluted fish population.
+
+The pol_prop scatterplot is pretty different than the DNE one. If you're rich, you're never going to eat a fish that is not safe to eat (eg, marked 'DO NOT EAT' on an advisory, and corresponding to polprop=2 on the scatterplot). However, you might be more likely to eat a medium polluted fish (polprop=2) if you're rich, similar to the DNE graph.
+
+The polprop stacked barplot shows that the top 25% of the income distribution is way overrepresented in the population that eats fish with advisories (unlike in the DNE plot, where the bottom 25% were overrepresented). But if you're in the 50-75% mark, you are underrepresented. The violin plot is similar. The differences here could be from having fewer observations of people eating polluted fish, leading to an uneven distribution of incomes (it could be that really the distribution is the same across all pollution levels).
+
+In summary, it seems like income is positively correlated with pollution because of a few people who come from zipcodes that on average make \>150K. However, these people never eat fish that are dangerous to eat; only people that make \<150K eat those. People in the bottom 25% are more likely to eat fish with more serious advisories, but not more likely to eat fish with general advisories.
+
+Not english
+
+```{r}
+#dne
+ggplot(data = demog_tripid, aes(x=not_english, y=dne_total))+geom_point(alpha=0.2,position="jitter")
+ggplot(demog_tripid, aes(x=dne_total, fill=ne_quant)) +geom_bar(position="fill")
+ggplot(demog_tripid, aes(x = not_english, y = dne_str)) +  geom_violin() + theme_minimal()
+#polprop
+ggplot(data = demog_tripid, aes(x=not_english, y=polluted_proportion))+geom_point(alpha=0.2,position="jitter")
+ggplot(demog_tripid, aes(x=polprop_quant, fill=ne_quant)) +geom_bar(position="fill")
+ggplot(demog_tripid, aes(x = not_english, y = polprop_quant)) +  geom_violin() + theme_minimal()
+```
+
+The DNE scatterplot shows that immigrant communities (\>60% non-English speaking zip codes) do not eat any polluted fish, although it seems like zip codes with \~50% nonenglish speaking households are overrepresented in the distribution of people who eat polluted fish.
+
+The stacked barplot shows that the second-lowest quartile of non-english speaking communities is vastly overrepresented in people who eat polluted fish; however, the second-largest quartile is the top quartile of non-english speaking communities. The violin plot shows that the biggest difference between the distributions happens at about the 18% non english speaking households mark: it seems that these communities are more likely to eat polluted fish. Also, again, very high non-english speaking populations simply do not eat any polluted fish.
+
+The polprop scatterplot shows a relatively straightforward negative relationship between eating polluted fish and not speaking English. Only zip codes with less than 20% non English speakers seem to eat polluted fish. The stacked barplot shows that the top quartile of nonenglish speaking is overrepresented in eating fish with any advisory.
+
+In summary, fishermen from zipcodes with \>60% non-English speakers do not eat any fish with advisories. Zip codes that are about a fifth immigrant are more likely to eat fish with advisories. However, the top quartile of non-english speaking-ness is also more likely to eat fish with advisories.
+
+Black:
+
+```{r}
+#dne
+ggplot(data = demog_tripid, aes(x=black, y=dne_total))+geom_point(alpha=0.2,position="jitter")
+ggplot(demog_tripid, aes(x=dne_total, fill=black_quant)) +geom_bar(position="fill")
+ggplot(demog_tripid, aes(x = black, y = dne_str)) +  geom_violin() + theme_minimal()
+#polprop
+ggplot(data = demog_tripid, aes(x=black, y=polluted_proportion))+geom_point(alpha=0.2,position="jitter")
+ggplot(demog_tripid, aes(x=polprop_quant, fill=black_quant)) +geom_bar(position="fill")
+ggplot(demog_tripid, aes(x = black, y = polprop_quant)) +  geom_violin() + theme_minimal()
+```
+
+The story for black anglers seems similarly confusing. The DNE scatterplot shows a distribution that seems similar between people who eat polluted fish and people who don't. Very black communities are more likely to eat fish with serious advisories, but medium-black communities are less likely. The polprop scatterplot shows that if your community is \>55% black, you never eat any dangerous fish, and otherwise a seemlingly loose negative relationship between percent black and eating polluted fish.
+
+nonwhite:
+
+```{r}
+#dne
+ggplot(data = demog_tripid, aes(x=nonwhite, y=dne_total))+geom_point(alpha=0.2,position="jitter")
+ggplot(demog_tripid, aes(x=dne_total, fill=nonwhite_quant)) +geom_bar(position="fill")
+ggplot(demog_tripid, aes(x = nonwhite, y = dne_str)) +  geom_violin() + theme_minimal()
+#polprop
+ggplot(data = demog_tripid, aes(x=nonwhite, y=polluted_proportion))+geom_point(alpha=0.2,position="jitter")
+ggplot(demog_tripid, aes(x=polprop_quant, fill=nonwhite_quant)) +geom_bar(position="fill")
+ggplot(demog_tripid, aes(x = nonwhite, y = polprop_quant)) +  geom_violin() + theme_minimal()
+
+```
+
+```{r}
+ggplot(demog_tripid|>filter(income_quant %in% list(1,2)),aes(x=dne_total)) + geom_histogram()
+ggplot(demog_tripid|>filter(income_quant %in% list(3,4)),aes(x=dne_total)) + geom_histogram()
+```

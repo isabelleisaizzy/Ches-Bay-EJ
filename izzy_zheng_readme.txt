@@ -2,6 +2,7 @@ This readme explains the following files, which were made to analyze fishing in 
 1. making_buffer_zip.qmd (Ches Bay EJ > Programs) 
 2. making_trip_catch_2022.qmd (Ches Bay EJ > Programs)
 3. 2022_visualizations - subsistence_buffer.qmd (Ches Bay EJ > Programs)
+3.5 making_tripcatch_2022_sites.qmd (Ches Bay EJ > Programs)
 4. making_trip_catch_2022_piv_acs.qmd (Ches Bay EJ > Programs)
 5. 2022_summstat.qmd (Ches Bay EJ > Figures)
 6. correlation_tables.qmd (Ches Bay EJ > Figures)
@@ -15,16 +16,21 @@ Use in other files: buffer_zip is used in making_trip_catch_2022.qmd and 2022_vi
 2. making_trip_catch_2022.qmd (Ches Bay EJ > Programs)
 Function: This file creates trip_catch_2022, a good dataset to use for mapping aggregate fish data across species. It is at the trip ID-species level, which means there is one data observation for every species in every interview. trip_catch_2022 is made by joining all of the trip and catch data from 2022 in the APAIS survey, and then filtering to just zip codes in buffer_zip. 
 Inputs: NOAA APAIS survey data - all catch.csv and trip.csv files in data > NOAA MRF, buffer_zip from making_buffer_zip.qmd
-Use in other files: trip_catch_2022 used in 2022_visualizations - subsistence_buffer.qmd (Ches Bay EJ > Programs)
+Use in other files: trip_catch_2022 used in 2022_visualizations - subsistence_buffer.qmd (Ches Bay EJ > Programs) and making_trip_catch_2022_piv_acs.qmd(Ches Bay EJ > Programs)
 
 3. 2022_visualizations - subsistence_buffer.qmd (Ches Bay EJ > Programs)
 Function: Wrangles trip_catch_2022 into a zip code level dataset and saves it as tripcatch_2022_zip.RData. Makes maps and graphs of number of claim, percentage eaten of total catch, total weight, number of trips. Also creates some bivariate maps that show percentage of families who speak a non-English language at home against percentage eaten of total catch. 
 Inputs: trip_catch_2022 from making_trip_catch_2022.qmd, buffer_zip from making_buffer_zip.qmd, active_sites from making_buffer_zip.qmd, 
 Use in other files: tripcatch_2022_zip used in 2022_summ_stat.qmd
 
+3.5 making_tripcatch_2022_sites.qmd (Ches Bay EJ > Programs)
+Function: joins trip_catch_2022 with site data and advisory data and water quality data
+inputs:trip_catch_2022 from making_trip_catch_2022.qmd, Chesapeake_Bay_Watershed_Boundary from data > watershed boundary > Chesapeake_Bay_Watershed_Boundary.shp, active_sites from making_buffer_zip.qmd, maryland and virginia waterbody shapefiles from emailing the government, maryland advisory from https://mde.maryland.gov/programs/marylander/fishandshellfish/Documents/Maryland_Fish_Advisories.pdf, virginia advisory data included in shapefiles, water quality from https://hub.arcgis.com/documents/ChesBay::chesapeake-bay-water-quality-database-1/explore
+
+
 4. making_trip_catch_2022_piv_acs.qmd (Ches Bay EJ > Programs)
 Function: Creates acs_economic_cleaner, acs_imm_cleaner, and acs_race_cleaner, which are the cleaned zip code level ACS variable datasets. Creates trip_catch_2022_piv_acs, which is for running regressions. trip_catch_2022_piv_acs is made by pivoting the trip_catch_2022 data to be at trip ID level, meaning 1 observation per interview (which can correspond to multiple fishermen). It is then joined with the cleaned ACS datasets. The finished dataset trip_catch_2022_piv_acs is trip-level data that has ACS EJ variables.  
-Inputs: trip_catch_2022 from making_trip_catch_2022.qmd, ACS zip code level data (one download URL is https://data.census.gov/table?g=040XX00US09$8600000,10$8600000,11$8600000,24$8600000,34$8600000,36$8600000,37$8600000,42$8600000,51$8600000,54$8600000&d=ACS+5-Year+Estimates+Data+Profiles&tid=ACSDP5Y2021.DP02) - ACSDP5Y2021.DP03-Data.csv from data > acs_data > acs_economic, ACSDP5Y2021.DP02-Data.csv from data > acs_data > acs_imm, ACSDP5Y2021.DP05-Data.csv from data > acs_data > acs_race, 
+Inputs: tripcatch_2022_sites from making_tripcatch_2022_sites.qmd , ACS zip code level data (one download URL is https://data.census.gov/table?g=040XX00US09$8600000,10$8600000,11$8600000,24$8600000,34$8600000,36$8600000,37$8600000,42$8600000,51$8600000,54$8600000&d=ACS+5-Year+Estimates+Data+Profiles&tid=ACSDP5Y2021.DP02) - ACSDP5Y2021.DP03-Data.csv from data > acs_data > acs_economic, ACSDP5Y2021.DP02-Data.csv from data > acs_data > acs_imm, ACSDP5Y2021.DP05-Data.csv from data > acs_data > acs_race, 
 Use in other files: trip_catch_2022_piv_acs used in tentative_regressions.qmd (Ches Bay EJ > Programs), 2022_sum mstat.qmd (Ches Bay EJ > Figures), correlation_tables.qmd (Ches Bay EJ > Figures)
 
 5. 2022_summstat.qmd (Ches Bay EJ > Figures)
@@ -41,4 +47,9 @@ Use in other files: none
 Function: runs preliminary regressions to see if there are relationships between EJ variables and percentage of fish eaten. 
 Inputs: trip_catch_2022_piv_acs from making_trip_catch_2022_piv_acs
 Use in other files: none
+
+8. making_piv_acs_advisory_2022.qmd (Ches Bay EJ > Programs)
+Function: uses trip_catch_2022_piv_acs and trip advisory data to make 2022_piv_acs_advisory, which links each entry to the advisory danger level. Not complete yet; ATM only links the entry to the water body. Need to join the water body to trip_catch_2022_piv_acs, and then join trip advisory data by species and water body and weight
+Inputs: trip_catch_2022_piv_acs, trip advisory data from VA:https://www.vdh.virginia.gov/environmental-health/public-health-toxicology/fish-consumption-advisory/ and MD:https://mde.maryland.gov/programs/marylander/fishandshellfish/Documents/Maryland_Fish_Advisories.pdf, and basin group shapefiles from https://data-chesbay.opendata.arcgis.com/datasets/ChesBay::chesapeake-bay-major-basin-summary-groups/explore?location=38.771879%2C-76.744447%2C7.00 
+
 

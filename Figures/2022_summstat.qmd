@@ -19,10 +19,11 @@ load(here('data','intermediate_datasets',"tripcatch_2022_acs.RData"))
 
 percent_eaten_reg_data <- trip_catch_2022_piv_acs |>
   select(unemployment,income,not_english,black,nonwhite,
-         noncit, pct_pov, bad_english, college, white, 
-         indigenous, asian, pac_islander, hispanic,
-         mode_reg,hrsf,age,ffdays2,cntrbtrs,gender,wave,
-         intsite,percent_eaten, st_res,wp_int,desired_fish)|>
+         #noncit, pct_pov, bad_english, college, white, 
+         #indigenous, asian, pac_islander, hispanic,
+         #mode_reg,hrsf,age,ffdays2,cntrbtrs,gender,wave,
+         #site_id,percent_eaten, st_res,wp_int,desired_fish,
+         dne_total,polluted_proportion)|>
   na.omit()
 ```
 
@@ -37,7 +38,7 @@ str_vars <- percent_eaten_reg_data |>
          #starts_with('wgt'),starts_with('tot_cat'),wp_int)|>
   #select(where(is.numeric))
 dep_indep <-percent_eaten_reg_data |>
-  select(percent_eaten,#dep var
+  select(percent_eaten, dne_total,polluted_proportion,#dep var
          unemployment,pct_pov,income,college, #richness
          noncit,not_english,bad_english,#immigrant
          black,nonwhite,white,asian,#race/eth

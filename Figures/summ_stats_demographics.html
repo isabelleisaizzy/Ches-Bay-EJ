@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.433">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>summ_stats_demographics</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="summ_stats_demographics_files/libs/clipboard/clipboard.min.js"></script>
+<script src="summ_stats_demographics_files/libs/quarto-html/quarto.js"></script>
+<script src="summ_stats_demographics_files/libs/quarto-html/popper.min.js"></script>
+<script src="summ_stats_demographics_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="summ_stats_demographics_files/libs/quarto-html/anchor.min.js"></script>
+<link href="summ_stats_demographics_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="summ_stats_demographics_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="summ_stats_demographics_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="summ_stats_demographics_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="summ_stats_demographics_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">summ_stats_demographics</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(here)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(psych)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(corrplot)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>data_path <span class="ot">&lt;-</span> <span class="fu">here</span>(<span class="st">'data'</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="fu">here</span>(<span class="st">'data'</span>,<span class="st">'intermediate_datasets'</span>,<span class="st">"trip_catch_2022_piv_acs.RData"</span>))</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="fu">here</span>(<span class="st">'data'</span>,<span class="st">'intermediate_datasets'</span>,<span class="st">"tripcatch_2022_acs.RData"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Demographic Summary Statistics: trip ID level</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>demog_tripid <span class="ot">&lt;-</span>trip_catch_2022_piv_acs <span class="sc">|&gt;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(tot_cat_1<span class="sc">&gt;</span><span class="dv">0</span>)<span class="sc">|&gt;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>         unemployment,pct_pov,income,college, <span class="co">#richness</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>         noncit,not_english,bad_english,foreign_born,<span class="co">#immigrant</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>         black,nonwhite,white,asian,<span class="co">#race/eth</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>         indigenous,pac_islander,hispanic,nonwhite, <span class="co">#race/eth</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>         dne_total, polluted_proportion,water_body,num_ramps <span class="co">#outcome vars</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>         ) <span class="sc">|&gt;</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">na.omit</span>()</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>demog_tripid_summstat <span class="ot">&lt;-</span> <span class="fu">describe</span>(demog_tripid,<span class="at">fast=</span><span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in FUN(newX[, i], ...): no non-missing arguments to min; returning Inf</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in FUN(newX[, i], ...): no non-missing arguments to max; returning -Inf</code></pre>
+</div>
+</div>
+<p>correlation tables (not shown atm because demog_tripid contains string variables)</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">#source("http://www.sthda.com/upload/rquery_cormat.r")</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co">#rquery.cormat(demog_tripid)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>demographic summary statistics: zip code level</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co">#demog_zip &lt;-tripcatch_2022_acs |&gt;</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co">#  st_drop_geometry()|&gt;</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co">#  select(</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co">#         unemployment,pct_pov,income,college, #richness</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co">#         noncit,not_english,bad_english,foreign_born,#immigrant</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co">#         black,nonwhite,white,asian,#race/eth</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="co">#         indigenous,pac_islander,hispanic,nonwhite #race/eth</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co">#         )</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co">#demog_zip_summstat &lt;- describe(demog_zip,fast=TRUE)</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co">#demog_zip_summstat</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>distribution of foreign born by zip:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">#ggplot(data = tripcatch_2022_acs, aes(x=foreign_born))+geom_histogram()</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>correlation tables</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co">#source("http://www.sthda.com/upload/rquery_cormat.r")</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co">#rquery.cormat(demog_zip)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>generate percentile dummies for ejs</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>income,<span class="at">probs=</span><span class="fu">c</span>(<span class="fl">0.25</span>,<span class="fl">0.5</span>,<span class="fl">0.75</span>,<span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>    25%     50%     75%    100% 
+ 64.650  83.529 106.992 247.730 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>black,<span class="at">probs=</span><span class="fu">c</span>(<span class="fl">0.25</span>,<span class="fl">0.5</span>,<span class="fl">0.75</span>,<span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> 25%  50%  75% 100% 
+ 8.9 16.7 32.0 93.0 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>not_english,<span class="at">probs=</span><span class="fu">c</span>(<span class="fl">0.25</span>,<span class="fl">0.5</span>,<span class="fl">0.75</span>,<span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> 25%  50%  75% 100% 
+ 5.1  8.4 12.9 76.6 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>polluted_proportion,<span class="at">probs=</span><span class="fu">c</span>(<span class="fl">0.35</span>,<span class="fl">0.7</span>,<span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> 35%  70% 100% 
+ 0.0  0.1  2.0 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co">#shows that prolprop is 0 up to 80th percentile</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>demog_tripid<span class="ot">&lt;-</span> demog_tripid <span class="sc">|&gt;</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">income_quant =</span> <span class="fu">case_when</span>(</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    income <span class="sc">&lt;</span> <span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>income,<span class="fl">0.25</span>) <span class="sc">~</span> <span class="st">"0-25%"</span>,</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">between</span>(income,<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>income,<span class="fl">0.25</span>),<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>income,<span class="fl">0.5</span>)) <span class="sc">~</span> <span class="st">"25-50%"</span>,</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">between</span>(income,<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>income,<span class="fl">0.5</span>),<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>income,<span class="fl">0.75</span>)) <span class="sc">~</span> <span class="st">"50-75%"</span>,</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    income <span class="sc">&gt;</span> <span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>income,<span class="fl">0.75</span>) <span class="sc">~</span> <span class="st">"75-100%"</span>,</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">black_quant =</span> <span class="fu">case_when</span>(</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>    black <span class="sc">&lt;</span> <span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>black,<span class="fl">0.25</span>) <span class="sc">~</span> <span class="st">"0-25%"</span>,</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">between</span>(black,<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>black,<span class="fl">0.25</span>),<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>black,<span class="fl">0.5</span>)) <span class="sc">~</span> <span class="st">"25-50%"</span>,</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">between</span>(black,<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>black,<span class="fl">0.5</span>),<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>black,<span class="fl">0.75</span>)) <span class="sc">~</span> <span class="st">"50-75%"</span>,</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>    black <span class="sc">&gt;</span> <span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>black,<span class="fl">0.75</span>) <span class="sc">~</span> <span class="st">"75-100%"</span>,</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">ne_quant =</span> <span class="fu">case_when</span>(</span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>    not_english <span class="sc">&lt;</span> <span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>not_english,<span class="fl">0.25</span>) <span class="sc">~</span> <span class="st">"0-25%"</span>,</span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>    <span class="fu">between</span>(not_english,<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>not_english,<span class="fl">0.25</span>),<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>not_english,<span class="fl">0.5</span>)) <span class="sc">~</span> <span class="st">"25-50%"</span>,</span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">between</span>(not_english,<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>not_english,<span class="fl">0.5</span>),<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>not_english,<span class="fl">0.75</span>)) <span class="sc">~</span> <span class="st">"50-75%"</span>,</span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>    not_english <span class="sc">&gt;</span> <span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>not_english,<span class="fl">0.75</span>) <span class="sc">~</span> <span class="st">"75-100%"</span></span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a>  <span class="at">nonwhite_quant =</span> <span class="fu">case_when</span>(</span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>    nonwhite <span class="sc">&lt;</span> <span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>nonwhite,<span class="fl">0.25</span>) <span class="sc">~</span> <span class="st">"0-25%"</span>,</span>
+<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>    <span class="fu">between</span>(nonwhite,<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>nonwhite,<span class="fl">0.25</span>),<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>nonwhite,<span class="fl">0.5</span>)) <span class="sc">~</span> <span class="st">"25-50%"</span>,</span>
+<span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>    <span class="fu">between</span>(nonwhite,<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>nonwhite,<span class="fl">0.5</span>),<span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>nonwhite,<span class="fl">0.75</span>)) <span class="sc">~</span> <span class="st">"50-75%"</span>,</span>
+<span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a>    nonwhite <span class="sc">&gt;</span> <span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>nonwhite,<span class="fl">0.75</span>) <span class="sc">~</span> <span class="st">"75-100%"</span></span>
+<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a>  <span class="at">polprop_quant =</span> <span class="fu">case_when</span>(</span>
+<span id="cb17-28"><a href="#cb17-28" aria-hidden="true" tabindex="-1"></a>    polluted_proportion<span class="sc">==</span><span class="dv">0</span> <span class="sc">~</span> <span class="st">"equal to 0, ~bottom 70%"</span>,</span>
+<span id="cb17-29"><a href="#cb17-29" aria-hidden="true" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> <span class="st">"greater than 0%"</span></span>
+<span id="cb17-30"><a href="#cb17-30" aria-hidden="true" tabindex="-1"></a>  ))</span>
+<span id="cb17-31"><a href="#cb17-31" aria-hidden="true" tabindex="-1"></a><span class="co">#inspect&lt;-demog_tripid|&gt;</span></span>
+<span id="cb17-32"><a href="#cb17-32" aria-hidden="true" tabindex="-1"></a>  <span class="co">#select(polluted_proportion,polprop_quant)|&gt;</span></span>
+<span id="cb17-33"><a href="#cb17-33" aria-hidden="true" tabindex="-1"></a>  <span class="co">#unique()</span></span>
+<span id="cb17-34"><a href="#cb17-34" aria-hidden="true" tabindex="-1"></a>demog_tripid <span class="ot">&lt;-</span>demog_tripid <span class="sc">|&gt;</span></span>
+<span id="cb17-35"><a href="#cb17-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">dne_str =</span> <span class="fu">as.character</span>(dne_total))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>generate quantile dummies for dependents</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>dne_total,<span class="at">probs=</span><span class="fu">c</span>(<span class="fl">0.25</span>,<span class="fl">0.5</span>,<span class="fl">0.75</span>,<span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> 25%  50%  75% 100% 
+   0    0    0    1 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">quantile</span>(demog_tripid<span class="sc">$</span>polluted_proportion,<span class="at">probs=</span><span class="fu">c</span>(<span class="fl">0.25</span>,<span class="fl">0.5</span>,<span class="fl">0.75</span>,<span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> 25%  50%  75% 100% 
+ 0.0  0.0  0.1  2.0 </code></pre>
+</div>
+</div>
+<p>Income</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co">#dne</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>income, <span class="at">y=</span>dne_total))<span class="sc">+</span><span class="fu">geom_point</span>(<span class="at">alpha=</span><span class="fl">0.2</span>,<span class="at">position=</span><span class="st">"jitter"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-9-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>dne_total, <span class="at">fill=</span>income_quant)) <span class="sc">+</span><span class="fu">geom_bar</span>(<span class="at">position=</span><span class="st">"fill"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-9-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x =</span> income, <span class="at">y =</span> dne_str)) <span class="sc">+</span>  <span class="fu">geom_violin</span>() <span class="sc">+</span> <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-9-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co">#polprop</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>income, <span class="at">y=</span>polluted_proportion))<span class="sc">+</span><span class="fu">geom_point</span>(<span class="at">alpha=</span><span class="fl">0.2</span>,<span class="at">position=</span><span class="st">"jitter"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-9-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>polprop_quant, <span class="at">fill=</span>income_quant)) <span class="sc">+</span><span class="fu">geom_bar</span>(<span class="at">position=</span><span class="st">"fill"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-9-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x =</span> income, <span class="at">y =</span> polprop_quant)) <span class="sc">+</span>  <span class="fu">geom_violin</span>() <span class="sc">+</span> <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-9-6.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Income Summstat Comments: Based on the DNE scatterplot, it seems like you’re always more likely to not be eating polluted fish regardless of your income, but as income exceeds ~130K, your likelihood of eating polluted fish goes up. This could indicate what we were talking about earlier, where super high income fishermen perhaps go for extra big and thus polluted fish. It could also be an outlier problem (I’m not sure if R scatterplots have 1 point represent 1 observation?); there are only about3 observations that eat polluted fish that come from zip codes with average incomes &gt;175K.</p>
+<p>The stacked barplots show income distribution for people who do not eat fish with advisories and people who do. As would be expected, the people in the bottom 0-25% of the income distribution are overrepresented in the population who eat fish with advisories. However, the top 50% of the income distribution represents half of the population in both fishers who eat fish with advisories and fish who don’t.</p>
+<p>The violin plots show that for people with advisories, the distribution gets skinnier later, indicating that people with zip code incomes ~150K are more represented in the eating polluted fish population than in the not eating polluted fish population.</p>
+<p>The pol_prop scatterplot is pretty different than the DNE one. If you’re rich, you’re never going to eat a fish that is not safe to eat (eg, marked ‘DO NOT EAT’ on an advisory, and corresponding to polprop=2 on the scatterplot). However, you might be more likely to eat a medium polluted fish (polprop=2) if you’re rich, similar to the DNE graph.</p>
+<p>The polprop stacked barplot shows that the top 25% of the income distribution is way overrepresented in the population that eats fish with advisories (unlike in the DNE plot, where the bottom 25% were overrepresented). But if you’re in the 50-75% mark, you are underrepresented. The violin plot is similar. The differences here could be from having fewer observations of people eating polluted fish, leading to an uneven distribution of incomes (it could be that really the distribution is the same across all pollution levels).</p>
+<p>In summary, it seems like income is positively correlated with pollution because of a few people who come from zipcodes that on average make &gt;150K. However, these people never eat fish that are dangerous to eat; only people that make &lt;150K eat those. People in the bottom 25% are more likely to eat fish with more serious advisories, but not more likely to eat fish with general advisories.</p>
+<p>Not english</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co">#dne</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>not_english, <span class="at">y=</span>dne_total))<span class="sc">+</span><span class="fu">geom_point</span>(<span class="at">alpha=</span><span class="fl">0.2</span>,<span class="at">position=</span><span class="st">"jitter"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-10-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>dne_total, <span class="at">fill=</span>ne_quant)) <span class="sc">+</span><span class="fu">geom_bar</span>(<span class="at">position=</span><span class="st">"fill"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-10-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x =</span> not_english, <span class="at">y =</span> dne_str)) <span class="sc">+</span>  <span class="fu">geom_violin</span>() <span class="sc">+</span> <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-10-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co">#polprop</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>not_english, <span class="at">y=</span>polluted_proportion))<span class="sc">+</span><span class="fu">geom_point</span>(<span class="at">alpha=</span><span class="fl">0.2</span>,<span class="at">position=</span><span class="st">"jitter"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-10-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>polprop_quant, <span class="at">fill=</span>ne_quant)) <span class="sc">+</span><span class="fu">geom_bar</span>(<span class="at">position=</span><span class="st">"fill"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-10-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x =</span> not_english, <span class="at">y =</span> polprop_quant)) <span class="sc">+</span>  <span class="fu">geom_violin</span>() <span class="sc">+</span> <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-10-6.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>The DNE scatterplot shows that immigrant communities (&gt;60% non-English speaking zip codes) do not eat any polluted fish, although it seems like zip codes with ~50% nonenglish speaking households are overrepresented in the distribution of people who eat polluted fish.</p>
+<p>The stacked barplot shows that the second-lowest quartile of non-english speaking communities is vastly overrepresented in people who eat polluted fish; however, the second-largest quartile is the top quartile of non-english speaking communities. The violin plot shows that the biggest difference between the distributions happens at about the 18% non english speaking households mark: it seems that these communities are more likely to eat polluted fish. Also, again, very high non-english speaking populations simply do not eat any polluted fish.</p>
+<p>The polprop scatterplot shows a relatively straightforward negative relationship between eating polluted fish and not speaking English. Only zip codes with less than 20% non English speakers seem to eat polluted fish. The stacked barplot shows that the top quartile of nonenglish speaking is overrepresented in eating fish with any advisory.</p>
+<p>In summary, fishermen from zipcodes with &gt;60% non-English speakers do not eat any fish with advisories. Zip codes that are about a fifth immigrant are more likely to eat fish with advisories. However, the top quartile of non-english speaking-ness is also more likely to eat fish with advisories.</p>
+<p>Black:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="co">#dne</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>black, <span class="at">y=</span>dne_total))<span class="sc">+</span><span class="fu">geom_point</span>(<span class="at">alpha=</span><span class="fl">0.2</span>,<span class="at">position=</span><span class="st">"jitter"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-11-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>dne_total, <span class="at">fill=</span>black_quant)) <span class="sc">+</span><span class="fu">geom_bar</span>(<span class="at">position=</span><span class="st">"fill"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-11-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x =</span> black, <span class="at">y =</span> dne_str)) <span class="sc">+</span>  <span class="fu">geom_violin</span>() <span class="sc">+</span> <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-11-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="co">#polprop</span></span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>black, <span class="at">y=</span>polluted_proportion))<span class="sc">+</span><span class="fu">geom_point</span>(<span class="at">alpha=</span><span class="fl">0.2</span>,<span class="at">position=</span><span class="st">"jitter"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-11-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>polprop_quant, <span class="at">fill=</span>black_quant)) <span class="sc">+</span><span class="fu">geom_bar</span>(<span class="at">position=</span><span class="st">"fill"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-11-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x =</span> black, <span class="at">y =</span> polprop_quant)) <span class="sc">+</span>  <span class="fu">geom_violin</span>() <span class="sc">+</span> <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-11-6.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>The story for black anglers seems similarly confusing. The DNE scatterplot shows a distribution that seems similar between people who eat polluted fish and people who don’t. Very black communities are more likely to eat fish with serious advisories, but medium-black communities are less likely. The polprop scatterplot shows that if your community is &gt;55% black, you never eat any dangerous fish, and otherwise a seemlingly loose negative relationship between percent black and eating polluted fish.</p>
+<p>nonwhite:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="co">#dne</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>nonwhite, <span class="at">y=</span>dne_total))<span class="sc">+</span><span class="fu">geom_point</span>(<span class="at">alpha=</span><span class="fl">0.2</span>,<span class="at">position=</span><span class="st">"jitter"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-12-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>dne_total, <span class="at">fill=</span>nonwhite_quant)) <span class="sc">+</span><span class="fu">geom_bar</span>(<span class="at">position=</span><span class="st">"fill"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-12-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x =</span> nonwhite, <span class="at">y =</span> dne_str)) <span class="sc">+</span>  <span class="fu">geom_violin</span>() <span class="sc">+</span> <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-12-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="co">#polprop</span></span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>nonwhite, <span class="at">y=</span>polluted_proportion))<span class="sc">+</span><span class="fu">geom_point</span>(<span class="at">alpha=</span><span class="fl">0.2</span>,<span class="at">position=</span><span class="st">"jitter"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-12-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x=</span>polprop_quant, <span class="at">fill=</span>nonwhite_quant)) <span class="sc">+</span><span class="fu">geom_bar</span>(<span class="at">position=</span><span class="st">"fill"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-12-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid, <span class="fu">aes</span>(<span class="at">x =</span> nonwhite, <span class="at">y =</span> polprop_quant)) <span class="sc">+</span>  <span class="fu">geom_violin</span>() <span class="sc">+</span> <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-12-6.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid<span class="sc">|&gt;</span><span class="fu">filter</span>(income_quant <span class="sc">%in%</span> <span class="fu">list</span>(<span class="dv">1</span>,<span class="dv">2</span>)),<span class="fu">aes</span>(<span class="at">x=</span>dne_total)) <span class="sc">+</span> <span class="fu">geom_histogram</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-13-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(demog_tripid<span class="sc">|&gt;</span><span class="fu">filter</span>(income_quant <span class="sc">%in%</span> <span class="fu">list</span>(<span class="dv">3</span>,<span class="dv">4</span>)),<span class="fu">aes</span>(<span class="at">x=</span>dne_total)) <span class="sc">+</span> <span class="fu">geom_histogram</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="summ_stats_demographics_files/figure-html/unnamed-chunk-13-2.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
