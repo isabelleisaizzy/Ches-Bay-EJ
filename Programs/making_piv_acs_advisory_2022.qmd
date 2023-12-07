@@ -1,0 +1,49 @@
+---
+title: "making_piv_acs_advisory_2022.qmd"
+format: html
+editor: visual
+---
+
+uses trip_catch_2022_piv_acs, basin group shapefiles, and trip advisory data to make 2022_piv_acs_advisory, which links each entry to the advisory danger level.
+
+load data and libraries
+
+```{r}
+library(here)
+library(tidyverse)
+library(sf)
+library(tmap)
+library(geosphere)
+data_path <- here()
+load(here('data','intermediate_datasets',"trip_catch_2022_piv_acs.RData"))
+load(here('data',"intermediate_datasets","active_sites.Rdata"))
+james_advisory_bodies <- st_read(here('data',"Fish advisory shape files","JamesPolylines.shp"))
+chesapeake_advisory_bodies <- st_read(here('data',"Fish advisory shape files","ChesapeakePolylines.shp"))
+vdh_advisory_bodies <- st_read(here('data',"Fish advisory shape files","VDHFishConsAdvisoryPolygon.shp"))
+cb_sf <- st_read(here('data', 'watershed boundary', 'Chesapeake_Bay_Watershed_Boundary.shp')) #Chesapeake Bay shapefile
+md_rivers<-st_read(here('data',"Maryland_Waterbodies_-_Rivers_and_Streams_(Generalized)","HYDR_RiversStreamsGeneralized_USGS.shp"))
+```
+
+steps for maryland water bodies:
+
+-write a function that gets closest river from site
+
+-mutate(water_body = function(site_coordinates)
+
+add maryland advisory
+
+```{r}
+#mutate a risk level variable that represents meals of fish caught per month that are safe to eat for general population (not pregnant women, women who may become pregnant, nursing women, or children). 10 means limitless
+
+
+
+```
+
+```{r}
+md_contaminant_1 = case_when(species_1=="ATLANTIC CROAKER" ~ "PCB's",
+                                 species_1 == "AMERICAN EEL" & substr(site_id,1,2) == "24" ~ "PCB's",
+                                 species_1 == "BLUE CATFISH" & substr(site_id,1,2) == "24" ~ "PCB's",
+                                  species_1 == "CHANNEL CATFISH" & md_river %in% list("CHOPTANK R","PATAPSCO R","PATUXENT R") ~ "PCB's",
+                                 species_1 %in% list("LARGEMOUTH BASS","SMALLMOUTH BASS")  & md_river %in% list("PATAPSCO R","PATUXENT R") ~ "PCB's")
+    )
+```

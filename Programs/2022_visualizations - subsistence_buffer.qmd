@@ -29,7 +29,6 @@ load data. These datasets were made in the making_intermediate_datasets file in 
 load(here('data','intermediate_datasets','buffer_zip.RData'))
 load(here('data','intermediate_datasets','trip_catch_2022.RData'))
 load(here('data',"intermediate_datasets","active_sites.Rdata"))
-
 ```
 
 Visualizations
@@ -85,7 +84,7 @@ tripcatch_2022_zip <- buffer_zip |>
   left_join(tripcatch_2022_zip,by=c("ZCTA5CE20"="ZIP"))
 
 #if we do a right join with zip, you'll get all the zip codes but no relative knowledge of where they are
-save(tripcatch_2022_zip,file=here(data_path,"intermediate_datasets","trip_catch_2022_zip.RData")) #zip code level data
+save(tripcatch_2022_zip,file=here(data_path,"intermediate_datasets","tripcatch_2022_zip.RData")) #zip code level data
 ```
 
 ```{r}

@@ -24,7 +24,7 @@ load data
 data_path <- here('data') #relative path to the data folder
 zip <- st_read(here(data_path, 'zipcodes', 'tl_2020_us_zcta520.shp')) #zip code shapefiles originally taken from https://www2.census.gov/geo/tiger/TIGER2020/ZCTA520/
 zip<- zip |> select(-CLASSFP20,-MTFCC20,-FUNCSTAT20,-ALAND20,-AWATER20)
-access_df <- read.csv(here('data', 'NOAA MRF', 'Public Fishing Access Site Register', 'SITE.csv'))
+access_df <- read.csv(here('data', 'NOAA MRF', 'Public Fishing Access Site Register','SITE_new.csv'))
 cb_sf <- st_read(here(data_path, 'watershed boundary', 'Chesapeake_Bay_Watershed_Boundary.shp')) #Chesapeake Bay shapefile
 load(here('data','intermediate_datasets','trip_catch_2022.RData'))
 ```
@@ -33,17 +33,16 @@ load(here('data','intermediate_datasets','trip_catch_2022.RData'))
 cb_sf <- cb_sf|> st_transform(st_crs(zip)) 
 ```
 
-filter sites to active and within the CB border.
+filter sites to within the CB border.
 
 ```{r}
 cb_access_sf <- access_df %>%
-  rename_all(tolower) %>%
-    filter(status == 'Active') |>
+  rename_all(tolower) |>
   st_as_sf(coords = c(x = 'site_long',
              y = 'site_lat'),
-             crs = 4326) %>%
+             crs = 4326) |>
  st_transform(st_crs(zip)) |>
-    st_filter(cb_sf)
+    st_filter(cb_sf) #filter to sites in the cheseapeake bay
 save(cb_access_sf,file=here(data_path,"intermediate_datasets","active_sites.Rdata"))
 ```
 
