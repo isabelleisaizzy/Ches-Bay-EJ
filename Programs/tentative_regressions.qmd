@@ -22,10 +22,31 @@ proportion eaten
 #filter out NA's for percent_eaten; there are na's where tot_cat of the fisher == 0
 percent_eaten_reg_data <- trip_catch_2022_piv_acs |>
   filter(tot_cat_1 >0)|>
-  select(unemployment,income,not_english,black,nonwhite,
-         mode_reg,hrsf,age,ffdays2,cntrbtrs,gender,wave,
-         intsite,percent_eaten, st_res,wp_int,desired_fish)|>
+  select(unemployment,not_english,hispanic,black,wp_int, income,nonwhite,asian,
+         #mode_reg,hrsf,age,cntrbtrs,gender,wave,
+         #site_id,percent_eaten, st_res,wp_int,
+         dne_total, polluted_proportion,water_body,num_ramps,desired_fish,ffdays2,
+         light_att, num_advisories
+         )|>
   na.omit()
+
+percent_eaten_reg_data <- percent_eaten_reg_data |> 
+  mutate(catfish = (str_detect(toupper(species_1), "CATFISH")))
+```
+
+```{r}
+dne_reg<-lm(data = percent_eaten_reg_data,formula= dne_total ~ unemployment + black + hispanic + log(income)+light_att + num_advisories,
+      weights = percent_eaten_reg_data$wp_int)
+dne_df<-summary(dne_reg)
+dne_df
+```
+
+```{r}
+prop_polluted_reg<-lm(formula= polluted_proportion ~ not_english + black + unemployment + log(income) + light_att,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+prop_polluted_df<-summary(prop_polluted_reg)
+prop_polluted_df
 ```
 
 ```{r}
