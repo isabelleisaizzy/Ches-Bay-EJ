@@ -13,7 +13,7 @@ library(here)
 
 #load data
 data_path <- here('data') #relative path to the data folder
-load(here('data','intermediate_datasets','trip_catch_2022.RData'))
+load(here('data','intermediate_datasets','tripcatch_site_2022.RData'))
 ```
 
 Making ACS dataset.
@@ -114,7 +114,7 @@ If you want to only want to rerun the pivoting + data cleaning code without relo
 
 ```{r}
 data_path <- here('data') #relative path to the data folder
-load(here('data','intermediate_datasets','trip_catch_2022.RData'))
+load(here('data','intermediate_datasets','tripcatch_site_2022.RData'))
 load(here('data','intermediate_datasets','acs_economic_cleaner.RData'))
 load(here('data','intermediate_datasets','acs_race_cleaner.RData'))
 load(here('data','intermediate_datasets','acs_imm_cleaner.RData'))
@@ -124,12 +124,12 @@ pivot dataset
 
 ```{r}
 #pivot data so that it is at trip ID level rather than species level.
-trip_catch_2022 <- trip_catch_2022 |>
-  select(-sp_code,-tot_len_a,-tot_len_b1,-tot_len)|>#143149 when only excluding spcode #no species code or length of fish
+tripcatch_site_2022 <- tripcatch_site_2022 |>
+  select(-sp_code,-tot_len_a,-tot_len_b1)|>#143149 when only excluding spcode #no species code or length of fish
   mutate(ID_CODE=as.character(ID_CODE))|>
   group_by(ID_CODE)
   
-trip_catch_2022_piv <- trip_catch_2022 |>
+trip_catch_2022_piv <- tripcatch_site_2022 |>
   group_by(ID_CODE)|>
   reframe(prim_caught = case_when(
     max(wgt_b1) == wgt_b1[1] ~ common[1],
@@ -139,22 +139,34 @@ trip_catch_2022_piv <- trip_catch_2022 |>
     max(wgt_b1) == wgt_b1[5] ~ common[5],
     max(wgt_b1) == wgt_b1[6] ~ common[6],
   ),
-    #catch variables I thought were important
+  #light attenuation
+  light_att = light_att[1],
+  num_advisories = num_advisories[1],
+  #proportion of fish eaten that is polluted, eg, number of pollution monthly meals/total meals
+  polluted_proportion = case_when(
+    total_meals > 0 ~ sum(polluted_meals)/sum(total_meals),
+    total_meals == 0 ~ 0),#would like to regress by zip code maybe too
+  #total weight eaten by each trip
+  trip_fish_weight = sum(wgt_ab1),
+  
+  #catch variables I thought were important
           wave=WAVE[1],
           kod=kod[1],#kind of day
           mode_fx=MODE_FX[1],#type of fishing
           wp_int=wp_int[1],#did a quick check; wp_int has only 1 value per trip id. this is weighting variable
-          
+  
           #trip variables I thought were important
           prim2_common=prim2_common[1],#common name of second most desired fish
           prim1_common=prim1_common[1],#common name of most desired fish
+          st = ST[1],
+          cnty=CNTY[1],
           st_res=ST_RES[1],#state of residence
           cnty_res=CNTY_RES[1],#county of residence
           hrsf=HRSF[1],#hours fished
           age=AGE[1],#note 99 means refused
           ffdays2=FFDAYS2[1],#days fished in last two months
           ffdays12=FFDAYS12[1],#days fished in last year
-          intsite=INTSITE[1],#site code
+          site_id=site_id[1],#site code
           mode_f=MODE_F[1],#another mode of fishing variable
           cntrbtrs=CNTRBTRS[1],
           area_x=AREA_X[1],#dist from ocean of fishing area
@@ -174,7 +186,10 @@ trip_catch_2022_piv <- trip_catch_2022 |>
           distkeys=DISTKEYS[1],#distance from shore, ii
           leader=LEADER[1],#id code of leader
           
-          
+          #important site variables
+          num_ramps = x..of.ramps[1],
+          water_body = water_body[1],
+  
           #pivoted variables; catch characteristics
           species_1=common[1],
           claim_1=CLAIM[1],
@@ -187,7 +202,9 @@ trip_catch_2022_piv <- trip_catch_2022 |>
           wgt_a_1=wgt_a[1],
           wgt_b1_1=wgt_b1[1],
           tot_cat_1 = tot_cat[1],
-          
+          tot_len_1 = tot_len[1], #length of landing
+          advisory_meals_1 = advisory_meals[1], #gotta code dne_eaten so that it's na if 
+          dne_eaten_1 = dne_eaten[1],
           
           species_2=common[2],
           claim_2=CLAIM[2],
@@ -200,6 +217,9 @@ trip_catch_2022_piv <- trip_catch_2022 |>
           wgt_a_2=wgt_a[2],
           wgt_b1_2=wgt_b1[2],
           tot_cat_2 = tot_cat[2],
+          tot_len_2 = tot_len[2], #length of landing
+          advisory_meals_2 = advisory_meals[2],
+          dne_eaten_2 = dne_eaten[2],
                     
           species_3=common[3],
           claim_3=CLAIM[3],
@@ -212,6 +232,9 @@ trip_catch_2022_piv <- trip_catch_2022 |>
           wgt_a_3=wgt_a[3],
           wgt_b1_3=wgt_b1[3],
           tot_cat_3 = tot_cat[3],
+          tot_len_3 = tot_len[3],
+          advisory_meals_3 = advisory_meals[3],
+          dne_eaten_3 = dne_eaten[3],
 
           species_4=common[4],
           claim_4=CLAIM[4],
@@ -224,6 +247,9 @@ trip_catch_2022_piv <- trip_catch_2022 |>
           wgt_a_4=wgt_a[4],
           wgt_b1_4=wgt_b1[4],
           tot_cat_4 = tot_cat[4],
+          tot_len_4 = tot_len[4], 
+          advisory_meals_4 = advisory_meals[4],
+          dne_eaten_4 = dne_eaten[4],
 
           species_5=common[5],
           claim_5=CLAIM[5],
@@ -236,6 +262,9 @@ trip_catch_2022_piv <- trip_catch_2022 |>
           wgt_a_5=wgt_a[5],
           wgt_b1_5=wgt_b1[5],
           tot_cat_5 = tot_cat[5],
+          tot_len_5 = tot_len[5], 
+          advisory_meals_5 = advisory_meals[5],
+          dne_eaten_5 = dne_eaten[1],
 
           species_6=common[6],
           claim_6=CLAIM[6],
@@ -248,6 +277,9 @@ trip_catch_2022_piv <- trip_catch_2022 |>
           wgt_a_6=wgt_a[6],
           wgt_b1_6=wgt_b1[6],
           tot_cat_6 = tot_cat[6],
+          tot_len_6 = tot_len[6], 
+          advisory_meals_6 = advisory_meals[6],
+          dne_eaten_6 = dne_eaten[6],
 
           species_7=common[7],
           claim_7=CLAIM[7],
@@ -259,7 +291,11 @@ trip_catch_2022_piv <- trip_catch_2022 |>
           release_unadj_7=RELEASE_UNADJ[7],
           wgt_a_7=wgt_a[7],
           wgt_b1_7=wgt_b1[7],
-          tot_cat_7 = tot_cat[7]
+          tot_cat_7 = tot_cat[7],
+          tot_len_7 = tot_len[7],
+          advisory_meals_7 = advisory_meals[7],
+          dne_eaten_7 = dne_eaten[1],
+  
 )
     #note: common and species name have same # na's 
 ```
@@ -267,23 +303,59 @@ trip_catch_2022_piv <- trip_catch_2022 |>
 add ej variables + mutate new ones
 
 ```{r}
+#ej variables
 trip_catch_2022_piv_acs <-
   trip_catch_2022_piv |>
   left_join(acs_economic, by=c("zip"="ZIP"))|>
   left_join(acs_imm, by=c("zip"="ZIP"))|>
   left_join(acs_race, by=c("zip"="ZIP"))
 
+#other variables
 trip_catch_2022_piv_acs<-trip_catch_2022_piv_acs |>
   mutate(
          percent_eaten = case_when(
            rowSums(across(starts_with('tot_cat')),na.rm=TRUE) == 0 ~ NA,
-           TRUE ~ 100*rowSums(across(starts_with('landing')),na.rm=TRUE)/rowSums(across(starts_with('tot_cat')),na.rm=TRUE)))|>
+           TRUE ~ 100*rowSums(across(starts_with('landing')),na.rm=TRUE)/rowSums(across(starts_with('tot_cat')),na.rm=TRUE)),
+         fish_weights = trip_fish_weight * wp_int)|>
   select(-starts_with('GEO_ID'),-starts_with('-'),-NAME)
+```
+
+```{r}
+#experiment: regression at species level on advisory_meals
+tripcatch_site_2022_reg <- 
+  tripcatch_site_2022 |>
+  left_join(acs_economic, by=c("ZIP"="ZIP"))|>
+  left_join(acs_imm, by=c("ZIP"="ZIP"))|>
+  left_join(acs_race, by=c("ZIP"="ZIP"))
+
+percent_eaten_reg_data <- tripcatch_site_2022_reg |>
+  filter(tot_cat >0)|>
+  select(unemployment,income,not_english,black,nonwhite,wp_int,advisory_meals
+         )|>
+  na.omit()
+
+prop_polluted_reg<-lm(formula= advisory_meals ~ black + unemployment + income + not_english,
+  data=percent_eaten_reg_data,
+      weights = percent_eaten_reg_data$wp_int)
+prop_polluted_df<-summary(prop_polluted_reg)
+prop_polluted_df
 ```
 
 data cleaning
 
 ```{r}
+#replace all dne variables with 0 if na
+trip_catch_2022_piv_acs$dne_eaten_1=ifelse(is.na(trip_catch_2022_piv_acs$dne_eaten_1),0,trip_catch_2022_piv_acs$dne_eaten_1)
+trip_catch_2022_piv_acs$dne_eaten_2=ifelse(is.na(trip_catch_2022_piv_acs$dne_eaten_2),0,trip_catch_2022_piv_acs$dne_eaten_2)
+trip_catch_2022_piv_acs$dne_eaten_3=ifelse(is.na(trip_catch_2022_piv_acs$dne_eaten_3),0,trip_catch_2022_piv_acs$dne_eaten_3)
+trip_catch_2022_piv_acs$dne_eaten_4=ifelse(is.na(trip_catch_2022_piv_acs$dne_eaten_4),0,trip_catch_2022_piv_acs$dne_eaten_4)
+trip_catch_2022_piv_acs$dne_eaten_5=ifelse(is.na(trip_catch_2022_piv_acs$dne_eaten_5),0,trip_catch_2022_piv_acs$dne_eaten_5)
+trip_catch_2022_piv_acs$dne_eaten_6=ifelse(is.na(trip_catch_2022_piv_acs$dne_eaten_6),0,trip_catch_2022_piv_acs$dne_eaten_6)
+trip_catch_2022_piv_acs$dne_eaten_7=ifelse(is.na(trip_catch_2022_piv_acs$dne_eaten_7),0,trip_catch_2022_piv_acs$dne_eaten_7)
+
+
+
+
 trip_catch_2022_piv_acs <-
   trip_catch_2022_piv_acs |>
   mutate(age = case_when( #if age == 99, replace with NA
@@ -329,7 +401,7 @@ trip_catch_2022_piv_acs <-
   mode2001 = as.character(mode2001),
   mode_f=as.character(mode_f),
   mode_fx=as.character(mode_fx),
-  intsite = as.character(intsite),
+  site_id = as.character(site_id),
   mode_reg = case_when(
     mode_fx %in% c(1,2,3) ~ 'shore',
     mode_fx %in% c(4,5) ~ 'with captain',
@@ -365,13 +437,18 @@ trip_catch_2022_piv_acs <-
     sig_fish = case_when(
       prim_caught %in% c("ATLANTIC MENHADEN",'BLACK CRAPPIE','BLUE CATFISH','CHANNEL CATFISH','COBIA','MUMMICHOG','NORTHERN SNAKEHEAD','SEAROBIN FAMILY','SPANISH MACKEREL','SPOT','SUMMER FLOUNDER','UNIDENTIFIED CATFISHES','WHITE CATFISH','WHITE CRAPPIE','WHITE PERCH') ~ prim_caught,
       TRUE ~ "OTHER"
-    )
+    ),
+    dne_total = case_when(
+      rowSums(across(starts_with("dne_eaten"))) > 0 ~ 1,
+      TRUE ~ 0) 
     )
 #note: celltype and add_hrs only have 1 value the whole dataset, therefore omitting. they may be different in other years, but they have no impact on dataset since they only have one value. ommitting year for the same reason, but for future datasets merging over time obvs add year back in
 #note: i am not coding f_by_p to be NA when there is no available catch, as this may impact likelihood of consumption
 #note: i initially put in variable muni_res, municipality of residence, but it actually has no unique values, just NA
 #same for dist
-
+inspect <- trip_catch_2022_piv_acs |>
+  select(starts_with("dne"))|>
+  filter(dne_total == 1)
 ```
 
 ```{r}

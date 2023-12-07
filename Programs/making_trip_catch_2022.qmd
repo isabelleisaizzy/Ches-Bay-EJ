@@ -75,9 +75,10 @@ trip_catch_2022 <- trip_2022 |>
                             "region"="region",
                             "month"="month",
                             "wp_int"="wp_int",
-                            "date_published"="date_published"))
+                            "date_published"="date_published")) 
 trip_catch_2022 <- trip_catch_2022 |>
-  filter(ZIP %in% buffer_zip$ZCTA5CE20)
+  filter(ZIP %in% buffer_zip$ZCTA5CE20)|>
+  mutate(site_id = paste(ST,CNTY,INTSITE,sep="")) #site id for joining site info
 
 save(trip_catch_2022,file=here(data_path,"intermediate_datasets","trip_catch_2022.RData"))#NOT PIVOTED DATA; AT THE SPECIES-TRIPID LEVE
 ```

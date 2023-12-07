@@ -1,0 +1,521 @@
+---
+title: "making_tripcatch_2022_sites"
+format: html
+editor: visual
+---library(tidyverse)
+library(here)
+library(sf)
+library(tmap)
+---
+
+Takes tripcatch data and adds site characteristics based on site id, water body variable, and advisory variables
+
+join site data to water body, join site water body data to advisory data, join site water body advisory data to trip_catch_2022,
+
+```{r}
+#packages
+library(tidyverse)
+library(here)
+library(sf)
+library(tmap)
+
+#load data
+data_path <- here('data') #relative path to the data folder
+water_qual <- read.csv(here('data','WaterQualityLightAttenuationStation.csv'))
+load(here('data','intermediate_datasets','trip_catch_2022.RData'))
+load(here('data','intermediate_datasets','trip_catch_2022.RData'))
+load(here('data',"intermediate_datasets","active_sites.Rdata"))
+cb_sf <- st_read(here('data', 'watershed boundary', 'Chesapeake_Bay_Watershed_Boundary.shp')) #Chesapeake Bay shapefile
+#md_bodies<-st_read(here('data',"Maryland_Waterbodies_-_Rivers_and_Streams_(Generalized)","HYDR_RiversStreamsGeneralized_USGS.shp"))
+md_adv_bodies <- st_read(here('data',"Fish advisory shape files", "FCA_Data","Species.shp"))
+md_shapefiles <- st_read(here('data',"Fish advisory shape files", "FCA_Data","FCA_Areas.shp"))
+james_advisory_bodies <- st_read(here('data',"Fish advisory shape files","JamesPolylines.shp"))
+chesapeake_advisory_bodies <- st_read(here('data',"Fish advisory shape files","ChesapeakePolylines.shp"))
+vdh_advisory_bodies <- st_read(here('data',"Fish advisory shape files","VDHFishConsAdvisoryPolygon.shp"))
+potomac_advisory_bodies <- st_read(here('data',"Fish advisory shape files","PotomacPolylines.shp"))
+```
+
+```{r}
+cb_access_wb_sf <- cb_access_sf |> 
+  mutate(site_id = paste(state_code,county_code,site_external_id,sep=""))|>
+  select(site_id,state,x..of.ramps,headboat.only,private.access,is.fee.charged.to.the.public.for.use.of.site,retail.bait,shore.mode,tackle.shops)
+
+md_shapefiles <- md_shapefiles |>
+  st_make_valid(shp)|>
+  select(GIS_ID, Waterbody)
+
+#join md_adv_bodies to corresponding shapefile
+md_adv_bodies <- md_shapefiles |>
+  merge(md_adv_bodies |> st_drop_geometry(),by=c("GIS_ID","Waterbody"))
+
+
+```
+
+examine map of va water bodies
+
+```{r}
+tmap_leaflet(
+  tm_shape(james_advisory_bodies) + tm_lines(col = "red", id="Specific_W")+
+    tm_shape(vdh_james) + tm_polygons(col = "orange", id="Specific_W")+
+  tm_shape(cb_access_wb_sf|>filter(substr(site_id,1,2)!="24")) + tm_symbols(size = 1,alpha=0.5,id="site_id"))
+
+
+tmap_leaflet(
+  tm_shape(md_shapefiles) + tm_polygons(col = "Waterbody", palette="viridis",id="Waterbody"))
+
+vdh_advisory_bodies <- vdh_advisory_bodies |> st_make_valid(shp)
+tmap_leaflet(
+  tm_shape(vdh_advisory_bodies) + tm_polygons(col = "Specific_W", palette="viridis",id="Specific_W"))
+
+#check sosrting
+tmap_leaflet(
+  #tm_shape(waterbodies|>filter(name %in% cb_access_wb_sf$water_body)) + tm_lines(col = "name", palette="viridis",id="name")+
+  tm_shape(cb_access_wb_sf) + tm_symbols(size = 0.1,alpha=0.7,id="water_body",col="water_body",palette="viridis"))
+```
+
+make combined virginia waterbodies datasetva_waterbodies\$index \<- 1:nrow(va_waterbodies)
+
+```{r}
+#tweaking advisory_bodies datasets so that they can all append to each other
+chesapeake_advisory_bodies <- chesapeake_advisory_bodies|>mutate(Adv23 = NA,polygon=FALSE)|>select(-Specific_W,-AGUID,-Affected_L,-Basin,-Shape_Leng)
+vdh_advisory_bodies<-vdh_advisory_bodies|>select(-VDH_Waterb,-WBID,-BID,-OBJECTID_1,-Advisory,-AffectedLo,-MajorBasin,-AdvisoryAr,-AdvisoryTy,-Species,-Advisory_T,-Shape_Area,-Specific_W,-AGUID,-Affected_L,-Basin,-Shape_Leng)|>mutate(polygon=TRUE)
+potomac_advisory_bodies <- potomac_advisory_bodies|>mutate(Adv23 = NA,polygon=FALSE)|>select(-Specific_W,-AGUID,-Affected_L,-Basin,-Shape_Leng)
+james_advisory_bodies <- james_advisory_bodies |>mutate(polygon=FALSE)|>select(-Specific_W,-AGUID,-Affected_L,-Basin,-Shape_Leng)
+
+#combine them
+va_waterbodies <- rbind(chesapeake_advisory_bodies,vdh_advisory_bodies,potomac_advisory_bodies,james_advisory_bodies)
+
+#fix geometry
+va_waterbodies <- va_waterbodies |> st_make_valid(shp)
+#crs
+md_adv_bodies <- md_adv_bodies|>
+  st_transform(st_crs(cb_access_sf)) |>
+  mutate(index=GIS_ID+nrow(va_waterbodies))
+va_waterbodies <- va_waterbodies|>
+  st_transform(st_crs(cb_access_sf)) 
+
+va_waterbodies$index <- 1:nrow(va_waterbodies) #add index to join va advisories to later
+#make va and md together in waterbodies, which also contains index
+
+waterbodies <- va_waterbodies |>
+  mutate(Waterbody=Waterbody_)|>
+  select(Waterbody,polygon,geometry,index) |>
+  rbind(md_adv_bodies|>
+          mutate(polygon=TRUE)|>
+          select(Waterbody,polygon,geometry,index))
+
+
+```
+
+add closest river to cb_access_df
+
+```{r}
+
+#add water_body to cb_access_wb_sf
+cb_access_wb_sf <- cb_access_wb_sf |>
+  mutate(water_body = waterbodies$Waterbody[st_nearest_feature(cb_access_wb_sf, waterbodies)],
+    body_id=waterbodies$index[st_nearest_feature(cb_access_wb_sf, waterbodies)],
+    polygon = waterbodies$polygon[st_nearest_feature(cb_access_wb_sf, waterbodies)])
+
+```
+
+check work w mapping
+
+```{r}
+#mapping to check work
+#non-vdh bodies
+tmap_leaflet(
+  tm_shape(waterbodies|> #lines of water bodies that are in the site dataset
+             filter(index %in% cb_access_wb_sf$body_id &
+                      polygon == FALSE)) + 
+    tm_lines(col = "Waterbody", palette = "viridis",id="Waterbody")+
+    tm_shape(waterbodies|> #polygons of water bodies in the site dataset
+             filter(index %in% cb_access_wb_sf$body_id &
+                      polygon == TRUE)) + 
+    tm_polygons(col = "Waterbody", palette = "viridis",id="Waterbody")+
+  tm_shape(cb_access_wb_sf|>filter(polygon==FALSE)) + tm_symbols(size = 0.5,alpha=0.5,
+                                         col="water_body",palette = "viridis",id="water_body")+
+    tm_shape(cb_access_wb_sf|>filter(polygon==TRUE)) + tm_symbols(size = 0.5,alpha=0.5,
+                                         col="water_body",palette = "viridis",id="water_body"))
+
+```
+
+map water quality stations
+
+```{r}
+tmap_leaflet(
+  tm_shape(waterbodies|> #lines of water bodies that are in the site dataset
+             filter(index %in% cb_access_wb_sf$body_id &
+                      polygon == FALSE)) + 
+    tm_lines(col = "Waterbody", palette = "viridis",id="Waterbody")+
+  tm_shape(water_qual) + tm_symbols(size = 20,alpha=1,
+                                         col="MonitoringStation",palette = "viridis",id="MonitoringStation"))
+```
+
+join water quality to site data
+
+```{r}
+#relevant water quality indicators are turbidity (cloudiness of water), light attenuation, and nitrate concentration. these all are indicators of pesticides, not of mercury or pfas. pcbs you can tell thru sedimentation. 
+#however, pollution obviously impacts fishers not just in terms of fishing poison advisories
+#so let's just do light attenuation. here measured in UM/M**2/S
+#add wave variable to waterqual so that we can join waterqual to tripcatch by monitoring station and wave
+water_qual <- water_qual|>
+  select(MonitoringStation,SampleDate,MeasureValue,Unit,Latitude,Longitude)|>
+  mutate(WAVE=case_when(
+    substr(SampleDate,1,1) %in% list("1","2") ~ 1,
+    substr(SampleDate,1,1) %in% list("3","4") ~ 2,
+    substr(SampleDate,1,1) %in% list("5","6") ~ 3,
+    substr(SampleDate,1,1) %in% list("7","8") ~ 4,
+    substr(SampleDate,1,1) == "9" ~ 5,
+    substr(SampleDate,1,2) == "10" ~ 5,
+    substr(SampleDate,1,2) %in% list("11","12") ~ 6,
+  ))
+#convert into sf object
+water_qual <-water_qual|>
+  filter(!is.na(Latitude) & !is.na(Longitude))|>
+  st_as_sf(coords=c("Longitude","Latitude"))
+#set crs
+water_qual <- st_set_crs(water_qual,"WGS84")
+water_qual <- water_qual|>
+  st_transform(st_crs(cb_access_wb_sf))
+#take mean of all the samples collected at the same wave and station
+water_qual <-water_qual|>
+  group_by(MonitoringStation,WAVE)|>
+  summarize(obs = n(),
+    light_att = sum(MeasureValue)/obs)
+
+#connect site to nearest water quality station 
+cb_access_wb_sf <- cb_access_wb_sf |>
+  mutate(MonitoringStation = water_qual$MonitoringStation[st_nearest_feature(cb_access_wb_sf, water_qual)])
+
+#drop irrelevant vars
+water_qual <- water_qual|> select(MonitoringStation,WAVE,light_att)|>st_drop_geometry()
+
+#check work
+#inspect <- water_qual|>select(SampleDate,WAVE)|>st_drop_geometry()|>unique()
+```
+
+join site data to advisory data,
+
+```{r}
+#virginia
+site_advisory <- cb_access_wb_sf |>
+  st_drop_geometry()|>
+  left_join(va_waterbodies,by=c("body_id"="index"))|>
+  mutate(polygon = polygon.x)|>
+  select(-polygon.x,-polygon.y)
+#there must be body_ids in cb_access_wb_sf that do not exist in va_waterbodies. i believe this is from sites whose closest bodies are actually in virginia and they should go away.
+
+#add virginia number of advisories per site. i am doing this as, number of advisories where it's 2 per month or less, which is all of virginia advisories
+site_advisory <- site_advisory |>
+  mutate(num_advisories = 
+           case_when(
+    is.na(Adv1) ~ 0,
+    is.na(Adv2) ~ 1,
+    is.na(Adv3) ~ 2,
+    is.na(Adv4) ~ 3,
+    is.na(Adv5) ~ 4,
+    is.na(Adv6) ~ 5,
+    is.na(Adv7) ~ 6,
+    is.na(Adv8) ~ 7,
+    is.na(Adv9) ~ 8,
+    is.na(Adv10) ~ 9,
+    is.na(Adv11) ~ 10,
+    is.na(Adv12) ~ 11,
+    is.na(Adv13) ~ 12,
+    is.na(Adv14) ~ 13,
+    is.na(Adv15) ~ 14,
+    is.na(Adv16) ~ 15,
+    is.na(Adv17) ~ 16,
+    is.na(Adv18) ~ 17,
+    is.na(Adv19) ~ 18,
+    is.na(Adv20) ~ 19,
+    is.na(Adv21) ~ 20,
+    is.na(Adv22) ~ 21,
+    is.na(Adv23) ~ 22,
+    TRUE~23
+  ))
+
+#inspect <- site_advisory |> filter(state=="VA")|>select(site_id,body_id,starts_with("Adv"),num_advisories)
+```
+
+join tripcatch to site data
+
+```{r}
+tripcatch_site_2022<-trip_catch_2022|> inner_join(site_advisory,by=c("site_id"="site_id"))#inner join to remove observations with sites that were not in cb
+
+#join the water quality
+tripcatch_site_2022<-tripcatch_site_2022|> left_join(water_qual,by=c("WAVE"="WAVE","MonitoringStation"="MonitoringStation"))|>
+  select(-MonitoringStation)
+
+```
+
+try to mutate meals variable
+
+```{r}
+#va meals
+#if common in adv_1, return adv_1 string after second comma
+tripcatch_site_2022<-tripcatch_site_2022|>
+  mutate(va_adv = case_when(
+    str_detect(toupper(Adv1),toupper(common)) ~ str_split_i(Adv1, pattern = ",",i=3), #if species is in Adv1, return Adv1 after second comma
+    str_detect(toupper(Adv2), toupper(common)) ~ str_split_i(Adv2, pattern = ",",i=3),
+    str_detect(toupper(Adv3), toupper(common)) ~ str_split_i(Adv3, pattern = ",",i=3),
+    str_detect(toupper(Adv4), toupper(common)) ~ str_split_i(Adv4, pattern = ",",i=3),
+    str_detect(toupper(Adv5), toupper(common)) ~ str_split_i(Adv5, pattern = ",",i=3),
+    str_detect(toupper(Adv6), toupper(common)) ~ str_split_i(Adv6, pattern = ",",i=3),
+    str_detect(toupper(Adv7), toupper(common)) ~ str_split_i(Adv7, pattern = ",",i=3),
+    str_detect(toupper(Adv8), toupper(common)) ~ str_split_i(Adv8, pattern = ",",i=3),
+    str_detect(toupper(Adv9), toupper(common)) ~ str_split_i(Adv9, pattern = ",",i=3),
+    str_detect(toupper(Adv10), toupper(common)) ~ str_split_i(Adv10, pattern = ",",i=3),    
+    str_detect(toupper(Adv11), toupper(common)) ~ str_split_i(Adv11, pattern = ",",i=3),
+    str_detect(toupper(Adv12), toupper(common)) ~ str_split_i(Adv12, pattern = ",",i=3),
+    str_detect(toupper(Adv13), toupper(common)) ~ str_split_i(Adv13, pattern = ",",i=3),
+    str_detect(toupper(Adv14), toupper(common)) ~ str_split_i(Adv14, pattern = ",",i=3),
+    str_detect(toupper(Adv15), toupper(common)) ~ str_split_i(Adv15, pattern = ",",i=3),
+    str_detect(toupper(Adv16), toupper(common)) ~ str_split_i(Adv16, pattern = ",",i=3),
+    str_detect(toupper(Adv17), toupper(common)) ~ str_split_i(Adv17, pattern = ",",i=3),
+    str_detect(toupper(Adv18), toupper(common)) ~ str_split_i(Adv18, pattern = ",",i=3),
+    str_detect(toupper(Adv19), toupper(common)) ~ str_split_i(Adv19, pattern = ",",i=3),
+    str_detect(toupper(Adv20), toupper(common)) ~ str_split_i(Adv20, pattern = ",",i=3),
+    str_detect(toupper(Adv21), toupper(common)) ~ str_split_i(Adv21, pattern = ",",i=3)))
+
+#convert the advisory string to a number.
+tripcatch_site_2022<-tripcatch_site_2022|>
+  mutate(va_adv_meals = case_when(
+    va_adv == " DO NOT EAT" ~ 0,
+    va_adv == " No more than two meals/month" ~ 2,
+    va_adv == " No more two meals/month" ~ 2))
+
+checkwork <- tripcatch_site_2022 |>
+  select(va_adv,va_adv_meals)|>
+  unique()
+    
+#note that common is only ever NA if there were no fish caught
+#fish that have no advisory
+inspect<-tripcatch_site_2022|>
+  filter(!is.na(common))|>
+  select(common, starts_with("Adv"),va_adv)|>filter(is.na(va_adv))|>unique()
+
+```
+
+add variable md_adv based on site species length
+
+```{r}
+#maryland 
+#add num_advisories to md_adv_bodies and change species to uppercase
+md_adv_bodies <- md_adv_bodies |>
+  mutate(Species = toupper(Species))
+
+advisory_df <- md_adv_bodies |>
+  filter(General_Po %in% list("2 Meals per Month","1 Meal per Month","Eat Sparingly","Avoid","1 Meal/Every other Month"))|>
+  group_by(index)|>
+    summarize(num_advisories = n())|>
+  st_drop_geometry()
+
+md_adv_bodies<-md_adv_bodies|>
+  st_drop_geometry()|>
+  left_join(advisory_df,by=c("index"="index"))
+  
+
+tripcatch_site_2022 <- tripcatch_site_2022 |> #6561 obs
+  left_join(md_adv_bodies,by=c("body_id"="index","common"="Species"))
+#make one num_advisories var
+tripcatch_site_2022 <- tripcatch_site_2022 |> #6561 obs
+  mutate(num_advisories = case_when(
+    is.na(num_advisories.x) ~ num_advisories.y,
+    is.na(num_advisories.y) ~ num_advisories.x
+  ))|>
+  select(-num_advisories.x,-num_advisories.y)
+#rename some species
+md_adv_bodies$Species=ifelse(md_adv_bodies$Species=="Sunfish (including Bluegill)","SUNFISH",md_adv_bodies$Species)
+md_adv_bodies$Species=ifelse(md_adv_bodies$Species=="Flathead Catfish - All Sizes","FLATHEAD CATFISH",md_adv_bodies$Species)
+
+#spot fixes: species that have lengths
+tripcatch_site_2022 <- tripcatch_site_2022 |>
+  mutate(General_Po=case_when(
+    common=="BLUE CATFISH" & body_id ==1089 ~ "Avoid",
+    common=="BLUE CATFISH" & body_id %in% list(1136,1141,1105,1172) & between(tot_len,381,609.6)  ~  "No Limit",
+    common=="BLUE CATFISH" & body_id ==1132 & between(tot_len,381,609.6)  ~ "4 Meals per Month",#15-24
+    common=="BLUE CATFISH" & body_id ==1105 & between(tot_len,381,609.6)  ~ "1 Meal per Month",
+    common=="BLUE CATFISH" & body_id ==1145 & between(tot_len,304.8,381)  ~ "4 Meals per Month",#12-15
+    common=="BLUE CATFISH" & body_id ==1145 & tot_len>762 ~ "Avoid",#>30
+    common=="BLUE CATFISH" & body_id ==1145 & between(tot_len,609.6,762) ~ "1 Meal per Month",#24-30
+    common=="BLUE CATFISH" & body_id ==1145 & between(tot_len,381,609.6) ~ "4 Meals per Month",
+    common=="BLUE CATFISH" & body_id ==1150 & between(tot_len,304.8,381) ~ "4 Meals per Month",
+    common=="BLUE CATFISH" & body_id ==1150 & between(tot_len,381,609.6) ~ "2 Meals per Month",
+    common=="BLUE CATFISH" & body_id ==1150 & between(tot_len,609.6,762) ~ "1 Meal per Month",
+    common=="BLUE CATFISH" & body_id ==1150 & tot_len>762 ~ "Avoid",
+    common ==  "CHANNEL CATFISH" & body_id ==1104 & tot_len > 508 ~ "1 Meal/Every other Month
+", #20in
+    common ==  "CHANNEL CATFISH" & body_id ==1104 & tot_len < 508 ~ "6 Meals per Month",
+    common ==  "CHANNEL CATFISH" & body_id ==1145 & tot_len < 457.2 ~ "1 Meal/Every other Month
+", #18in
+    common ==  "CHANNEL CATFISH" & body_id ==1145 & tot_len > 457.2 ~ "Avoid",
+    common ==  "FLATHEAD CATFISH" & body_id ==1166 & tot_len < 558.8 ~ "No Limit",
+    common ==  "FLATHEAD CATFISH" & body_id ==1166 & tot_len > 558.8 ~ "7 Meals per Month",
+    common ==  "BLUEFISH" & body_id ==1091 & tot_len < 381 ~ "2 Meals per Month",
+    common ==  "BLUEFISH" & body_id ==1091 & tot_len > 381 ~ "Avoid",
+    common ==  "STRIPED BASS" & body_id ==1103 & tot_len < 736.6 ~ "3 Meals per Month",
+    common ==  "STRIPED BASS" & body_id ==1103 & tot_len > 736.6 ~ "1 Meal per Month",
+    common ==  "STRIPED BASS" & body_id ==1091  ~ "1 Meal per Month",
+    common ==  "STRIPED BASS" & body_id ==1138 & tot_len < 736.6 ~ "2 Meals per Month",
+    common ==  "STRIPED BASS" & body_id ==1138 & tot_len > 736.6 ~ "1 Meal per Month",
+    TRUE ~ General_Po
+  ))
+#no pairings available
+inspect<-tripcatch_site_2022 |>
+  filter(is.na(General_Po) & is.na(common)==FALSE & state=="MD")|>
+  select(site_id,body_id,common,General_Po)|>
+  unique()
+#now make inspect df that's all the na's for body-species combos
+```
+
+convert into meals variable
+
+```{r}
+tripcatch_site_2022 <- tripcatch_site_2022 |>
+  mutate(md_adv = case_when(
+    General_Po=="1 Meal/Every other Month" ~ 0.5,
+    General_Po=="1 Meal/Every other Month\n" ~ 0.5,
+    General_Po=="Avoid" ~ 0,
+    General_Po=="No Limit" ~ 10, 
+    is.na(General_Po) ~ 10,
+    General_Po=="Eat Sparingly" ~ 0.25,
+    General_Po=="No Limit\r\nNo Limit\r\nNo Limit" ~10,
+    TRUE ~ as.numeric(str_sub(General_Po, start = 1, end = 1)
+  )))
+
+inspect <- tripcatch_site_2022 |> 
+  select(General_Po,md_adv
+  ) |>unique()
+```
+
+```{r}
+#add advisory for all
+tripcatch_site_2022 <- tripcatch_site_2022 |>
+  mutate(advisory_meals = case_when(
+    !is.na(md_adv) & !is.na(va_adv_meals) ~ pmin(md_adv,va_adv_meals), #pick the smaller number of meals if there are two
+    !is.na(md_adv) & is.na(va_adv_meals) ~ md_adv,
+    !is.na(va_adv_meals) & is.na(md_adv) ~ va_adv_meals,
+    is.na(va_adv_meals) & is.na(va_adv_meals) & state == "VA" ~ 10, #assumes if site in virginia, no advisory means safe to eat. same assumption for MD, which was encoded earlier
+    is.na(md_adv) & is.na(va_adv_meals) & state == "MD" ~ 10 #if site in md and advisory is na, then it's na
+  ),
+  dne_eaten = case_when(
+    advisory_meals %in% list(0,1,2)  & landing != 0 ~ 1, #because there are only 23 observations such that dne happens
+    TRUE ~ 0 # if no advisory data on it, assume safe to eat
+  ),
+  polluted_meals = case_when(
+    advisory_meals > 0 & landing > 0 ~ wgt_ab1*35.274/8 * 1/advisory_meals,#number of monthly pollution units consumed. convert from kg to ounces, divide by 8 ounces to get number of meals, divide by advisory_meals
+    advisory_meals == 0 & landing > 0 ~ wgt_ab1*35.274/8 * 2,
+    landing == 0 ~ 0), #if unsafe to eat, every meal is worth 2 monthly pollution units 
+  total_meals = wgt_ab1*35.274/8) 
+
+#check work for dne_eaten and advisory_meals
+inspect <- tripcatch_site_2022|>
+  select(state,md_adv,va_adv_meals,advisory_meals,landing,dne_eaten)|>
+  unique()
+
+#check work for polluted meals and total meals
+inspect <- tripcatch_site_2022|>
+  select(wgt_ab1,landing,advisory_meals,polluted_meals,total_meals)|>
+  unique()
+
+```
+
+get rid of useless variables
+
+```{r}
+#tripcatch_site_2022 <- tripcatch_site_2022|>
+  #select(-strat_id,-psu_id,-AREA,-INTSITE,-TELEFON,-REEFCODE,-REEF,-geometry.x,-geometry.y)|> #by no means exhaustive list of useless variables
+  #st_drop_geometry()
+```
+
+construct site level data
+
+```{r}
+site_choice <- tripcatch_site_2022 |>
+  select(#would be all site level characteristics plus water quality and advisories)
+  group_by(site_id)
+```
+
+```{r}
+library(mapboxapi)
+library(here)
+library(tidyverse)
+load(here('data','intermediate_datasets','tripcatch_site_2022.RData')) #only for running here
+load(here('data','intermediate_datasets','tripcatch_2022_zip.RData')) #zipcode shapefiles
+#add geometry of both site points and zip code polygons to tripcatch_site_2022
+load(here('data',"intermediate_datasets","active_sites.Rdata"))
+
+cb_access_wb_sf <- cb_access_sf |> 
+  mutate(site_id = paste(state_code,county_code,site_external_id,sep=""))
+#join to site geometry
+tripcatch_site_2022s <- tripcatch_site_2022 |>
+  left_join(cb_access_wb_sf|>select(site_id,geometry),by=("site_id")) #geometry y.y is sites
+tripcatch_site_2022s <- tripcatch_site_2022s |>
+  left_join(tripcatch_2022_zip|>select(ZCTA5CE20,geometry),by=c("ZIP"="ZCTA5CE20"))
+#geometry is zip codes
+tripcatch_site_2022s <- tripcatch_site_2022s |>
+  select(-geometry.x.x,-geometry.x,-geometry.y)
+
+pairs <- tripcatch_site_2022s|>
+  select(site_id,geometry.y.y, ZIP, geometry)|>
+  unique()
+
+#split noaa data into df's by site id
+site_dfs <- split(tripcatch_site_2022s,tripcatch_site_2022s$site_id)
+quack <- site_dfs[1]|>as.data.frame()
+trav<- mb_matrix(quack[,4],quack[,3][1])
+quack$travel_times <- trav
+
+output_list <- list()
+for (i in site_dfs) {
+    i <- as.data.frame(i)
+    travel_times <- mb_matrix(i[,4],i[,3][1])
+    i$travel_time <- travel_times
+    output_list <- append(output_list,i)
+    }
+#write forloop that would run mb_matrix on each of them and assign the mb_matrix results to new variable in each df
+#leftjoin main data to each new df by zip and site id
+#now want to run matrix on all. if run matrix now, will get every time from every zip-site combo. want to only get every time from every zip site combo in dataset.
+#group by site (fewer sites than zips), make dataset for every site, run matrix on that, get times, rejoin to dataset, rejoin datasets for each site together. must be better way of doing this??
+relevant_sites <- tripcatch_site_2022s |>
+  select(site_id,geometry.y.y) |>unique()
+relevant_zips <- tripcatch_site_2022s|>
+  select(ZIP,geometry)|>unique()
+
+#want to only run matrix on every combination that appears in dataset. so like, for every site, run matrix on all zips that appear for that site
+
+travel_times_1 <- mb_matrix(origins = relevant_sites,
+                            destinations = relevant_zips)
+
+travel_times_1 <- mb_matrix(tripcatch_site_2022s$geometry.x|>unique()|>head(10),
+                            tripcatch_site_2022s$geometry.y|>unique()|>head(10))
+
+
+quack <- tripcatch_site_2022s|>head(1)
+matrix_1 <- tripcatch_site_2022s|>
+  select(site_id, ZIP, geometry.x,geometry.y)|>
+  unique()|>
+  head(10)|>
+  mutate(driving_time = mb_matrix(geometry.x, geometry.y,allow_large_matrix = TRUE))
+
+```
+
+```{r}
+library(tigris)
+library(mapdeck)
+
+philly_tracts <- tracts("PA", "Philadelphia", cb = TRUE, class = "sf")
+downtown_philly <- mb_geocode("Philadelphia City Hall, Philadelphia PA")
+
+time_to_downtown <- mb_matrix(philly_tracts, downtown_philly)
+
+philly_tracts$time <- time_to_downtown
+```
+
+save dataset
+
+```{r}
+save(tripcatch_site_2022,file=here(data_path,"intermediate_datasets","tripcatch_site_2022.RData"))
+```
