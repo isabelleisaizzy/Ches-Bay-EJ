@@ -8,9 +8,7 @@ library(sf)
 library(tmap)
 ---
 
-Takes tripcatch data and adds site characteristics based on site id, water body variable, and advisory variables
-
-join site data to water body, join site water body data to advisory data, join site water body advisory data to trip_catch_2022,
+This file takes NOAＡ tripcatch data and adds fishing site characteristics based on site id, water body variables, and advisory variables. First join site data to water body data,  then join site water body data to advisory data, then join site water body advisory data to trip_catch_2022:
 
 ```{r}
 #packages
@@ -35,23 +33,24 @@ vdh_advisory_bodies <- st_read(here('data',"Fish advisory shape files","VDHFishC
 potomac_advisory_bodies <- st_read(here('data',"Fish advisory shape files","PotomacPolylines.shp"))
 ```
 
+remove unnecessary variables and merge Maryland advisory shapefiles with advisory information
 ```{r}
-cb_access_wb_sf <- cb_access_sf |> 
+cb_access_wb_sf <- cb_access_sf |> #dataset of fishing sites and their site characteristics
   mutate(site_id = paste(state_code,county_code,site_external_id,sep=""))|>
   select(site_id,state,x..of.ramps,headboat.only,private.access,is.fee.charged.to.the.public.for.use.of.site,retail.bait,shore.mode,tackle.shops)
 
-md_shapefiles <- md_shapefiles |>
+md_shapefiles <- md_shapefiles |> #shapefiles of where certain advisories apply
   st_make_valid(shp)|>
   select(GIS_ID, Waterbody)
 
-#join md_adv_bodies to corresponding shapefile
+#join md_adv_bodies to corresponding shapefile (md_adv_bodies is the dataset of what advisories go with each water body)
 md_adv_bodies <- md_shapefiles |>
   merge(md_adv_bodies |> st_drop_geometry(),by=c("GIS_ID","Waterbody"))
 
 
 ```
 
-examine map of va water bodies
+examine map of VA and MD water bodies (what do the advisory shapefiles look like?)
 
 ```{r}
 tmap_leaflet(
@@ -67,16 +66,16 @@ vdh_advisory_bodies <- vdh_advisory_bodies |> st_make_valid(shp)
 tmap_leaflet(
   tm_shape(vdh_advisory_bodies) + tm_polygons(col = "Specific_W", palette="viridis",id="Specific_W"))
 
-#check sosrting
+#check sorting
 tmap_leaflet(
   #tm_shape(waterbodies|>filter(name %in% cb_access_wb_sf$water_body)) + tm_lines(col = "name", palette="viridis",id="name")+
   tm_shape(cb_access_wb_sf) + tm_symbols(size = 0.1,alpha=0.7,id="water_body",col="water_body",palette="viridis"))
 ```
 
-make combined virginia waterbodies datasetva_waterbodies\$index \<- 1:nrow(va_waterbodies)
+make combined virginia waterbody shapefiles dataset
 
 ```{r}
-#tweaking advisory_bodies datasets so that they can all append to each other
+#tweaking advisory_bodies datasets so that they can all append to each other in one dataset
 chesapeake_advisory_bodies <- chesapeake_advisory_bodies|>mutate(Adv23 = NA,polygon=FALSE)|>select(-Specific_W,-AGUID,-Affected_L,-Basin,-Shape_Leng)
 vdh_advisory_bodies<-vdh_advisory_bodies|>select(-VDH_Waterb,-WBID,-BID,-OBJECTID_1,-Advisory,-AffectedLo,-MajorBasin,-AdvisoryAr,-AdvisoryTy,-Species,-Advisory_T,-Shape_Area,-Specific_W,-AGUID,-Affected_L,-Basin,-Shape_Leng)|>mutate(polygon=TRUE)
 potomac_advisory_bodies <- potomac_advisory_bodies|>mutate(Adv23 = NA,polygon=FALSE)|>select(-Specific_W,-AGUID,-Affected_L,-Basin,-Shape_Leng)
@@ -87,7 +86,7 @@ va_waterbodies <- rbind(chesapeake_advisory_bodies,vdh_advisory_bodies,potomac_a
 
 #fix geometry
 va_waterbodies <- va_waterbodies |> st_make_valid(shp)
-#crs
+#changte crs so that VA matches MD
 md_adv_bodies <- md_adv_bodies|>
   st_transform(st_crs(cb_access_sf)) |>
   mutate(index=GIS_ID+nrow(va_waterbodies))
@@ -107,22 +106,21 @@ waterbodies <- va_waterbodies |>
 
 ```
 
-add closest river to cb_access_df
+add a variable that is the closest river to each site in cb_access_df (dataset of sites and their characteristics)
 
 ```{r}
 
 #add water_body to cb_access_wb_sf
 cb_access_wb_sf <- cb_access_wb_sf |>
-  mutate(water_body = waterbodies$Waterbody[st_nearest_feature(cb_access_wb_sf, waterbodies)],
-    body_id=waterbodies$index[st_nearest_feature(cb_access_wb_sf, waterbodies)],
-    polygon = waterbodies$polygon[st_nearest_feature(cb_access_wb_sf, waterbodies)])
+  mutate(water_body = waterbodies$Waterbody[st_nearest_feature(cb_access_wb_sf, waterbodies)],#name of the nearest water body
+    body_id=waterbodies$index[st_nearest_feature(cb_access_wb_sf, waterbodies)], #this will join to index in va_waterbodies later
+    polygon = waterbodies$polygon[st_nearest_feature(cb_access_wb_sf, waterbodies)]) #is the nearest feature a polygon or a line?
 
 ```
 
 check work w mapping
 
 ```{r}
-#mapping to check work
 #non-vdh bodies
 tmap_leaflet(
   tm_shape(waterbodies|> #lines of water bodies that are in the site dataset
@@ -140,73 +138,17 @@ tmap_leaflet(
 
 ```
 
-map water quality stations
-
-```{r}
-tmap_leaflet(
-  tm_shape(waterbodies|> #lines of water bodies that are in the site dataset
-             filter(index %in% cb_access_wb_sf$body_id &
-                      polygon == FALSE)) + 
-    tm_lines(col = "Waterbody", palette = "viridis",id="Waterbody")+
-  tm_shape(water_qual) + tm_symbols(size = 20,alpha=1,
-                                         col="MonitoringStation",palette = "viridis",id="MonitoringStation"))
-```
-
-join water quality to site data
-
-```{r}
-#relevant water quality indicators are turbidity (cloudiness of water), light attenuation, and nitrate concentration. these all are indicators of pesticides, not of mercury or pfas. pcbs you can tell thru sedimentation. 
-#however, pollution obviously impacts fishers not just in terms of fishing poison advisories
-#so let's just do light attenuation. here measured in UM/M**2/S
-#add wave variable to waterqual so that we can join waterqual to tripcatch by monitoring station and wave
-water_qual <- water_qual|>
-  select(MonitoringStation,SampleDate,MeasureValue,Unit,Latitude,Longitude)|>
-  mutate(WAVE=case_when(
-    substr(SampleDate,1,1) %in% list("1","2") ~ 1,
-    substr(SampleDate,1,1) %in% list("3","4") ~ 2,
-    substr(SampleDate,1,1) %in% list("5","6") ~ 3,
-    substr(SampleDate,1,1) %in% list("7","8") ~ 4,
-    substr(SampleDate,1,1) == "9" ~ 5,
-    substr(SampleDate,1,2) == "10" ~ 5,
-    substr(SampleDate,1,2) %in% list("11","12") ~ 6,
-  ))
-#convert into sf object
-water_qual <-water_qual|>
-  filter(!is.na(Latitude) & !is.na(Longitude))|>
-  st_as_sf(coords=c("Longitude","Latitude"))
-#set crs
-water_qual <- st_set_crs(water_qual,"WGS84")
-water_qual <- water_qual|>
-  st_transform(st_crs(cb_access_wb_sf))
-#take mean of all the samples collected at the same wave and station
-water_qual <-water_qual|>
-  group_by(MonitoringStation,WAVE)|>
-  summarize(obs = n(),
-    light_att = sum(MeasureValue)/obs)
-
-#connect site to nearest water quality station 
-cb_access_wb_sf <- cb_access_wb_sf |>
-  mutate(MonitoringStation = water_qual$MonitoringStation[st_nearest_feature(cb_access_wb_sf, water_qual)])
-
-#drop irrelevant vars
-water_qual <- water_qual|> select(MonitoringStation,WAVE,light_att)|>st_drop_geometry()
-
-#check work
-#inspect <- water_qual|>select(SampleDate,WAVE)|>st_drop_geometry()|>unique()
-```
-
-join site data to advisory data,
+join site data to advisory data for dataset that has sites, their characteristics, and the advisory waterbody the site is located within
 
 ```{r}
 #virginia
-site_advisory <- cb_access_wb_sf |>
+site_advisory <- cb_access_wb_sf |> 
   st_drop_geometry()|>
   left_join(va_waterbodies,by=c("body_id"="index"))|>
   mutate(polygon = polygon.x)|>
   select(-polygon.x,-polygon.y)
-#there must be body_ids in cb_access_wb_sf that do not exist in va_waterbodies. i believe this is from sites whose closest bodies are actually in virginia and they should go away.
 
-#add virginia number of advisories per site. i am doing this as, number of advisories where it's 2 per month or less, which is all of virginia advisories
+#add variable that is virginia's number of advisories per site, specifically number of advisories where it's 2 meals per month or less, which is all of virginia advisories
 site_advisory <- site_advisory |>
   mutate(num_advisories = 
            case_when(
@@ -239,14 +181,10 @@ site_advisory <- site_advisory |>
 #inspect <- site_advisory |> filter(state=="VA")|>select(site_id,body_id,starts_with("Adv"),num_advisories)
 ```
 
-join tripcatch to site data
+join tripcatch (NOAA　fishing trip data) to site advisory data
 
 ```{r}
-tripcatch_site_2022<-trip_catch_2022|> inner_join(site_advisory,by=c("site_id"="site_id"))#inner join to remove observations with sites that were not in cb
-
-#join the water quality
-tripcatch_site_2022<-tripcatch_site_2022|> left_join(water_qual,by=c("WAVE"="WAVE","MonitoringStation"="MonitoringStation"))|>
-  select(-MonitoringStation)
+tripcatch_site_2022<-trip_catch_2022|> inner_join(site_advisory,by=c("site_id"="site_id"))#inner join to remove observations with sites that were not in chesapeake bay
 
 ```
 
@@ -254,8 +192,9 @@ try to mutate meals variable
 
 ```{r}
 #va meals
-#if common in adv_1, return adv_1 string after second comma
-tripcatch_site_2022<-tripcatch_site_2022|>
+#long process of wrangling the number of meals safe to eat of a given fish at a given site
+#if common (eg fish species name) in adv_1, return adv_1 string after second comma
+tripcatch_site_2022<-tripcatch_site_2022|> 
   mutate(va_adv = case_when(
     str_detect(toupper(Adv1),toupper(common)) ~ str_split_i(Adv1, pattern = ",",i=3), #if species is in Adv1, return Adv1 after second comma
     str_detect(toupper(Adv2), toupper(common)) ~ str_split_i(Adv2, pattern = ",",i=3),
@@ -298,7 +237,7 @@ inspect<-tripcatch_site_2022|>
 
 ```
 
-add variable md_adv based on site species length
+add variable md_adv based on site species length. MD has different advisories based on length as well as fishing site and species
 
 ```{r}
 #maryland 
@@ -306,6 +245,7 @@ add variable md_adv based on site species length
 md_adv_bodies <- md_adv_bodies |>
   mutate(Species = toupper(Species))
 
+#filter to just advisories that are 2 meals per month or more serious, then group by index (eg waterbody) to get dataset of waterbody index + number of advisories per waterbody
 advisory_df <- md_adv_bodies |>
   filter(General_Po %in% list("2 Meals per Month","1 Meal per Month","Eat Sparingly","Avoid","1 Meal/Every other Month"))|>
   group_by(index)|>
@@ -314,7 +254,7 @@ advisory_df <- md_adv_bodies |>
 
 md_adv_bodies<-md_adv_bodies|>
   st_drop_geometry()|>
-  left_join(advisory_df,by=c("index"="index"))
+  left_join(advisory_df,by=c("index"="index")) #now this dataset has the number of advisories per waterbody
   
 
 tripcatch_site_2022 <- tripcatch_site_2022 |> #6561 obs
@@ -370,7 +310,7 @@ inspect<-tripcatch_site_2022 |>
 #now make inspect df that's all the na's for body-species combos
 ```
 
-convert into meals variable
+Add variable that is number of meals safe to eat per fish of given species at given site according to Maryland
 
 ```{r}
 tripcatch_site_2022 <- tripcatch_site_2022 |>
@@ -391,7 +331,7 @@ inspect <- tripcatch_site_2022 |>
 ```
 
 ```{r}
-#add advisory for all
+#add the number of meals safe to eat across both states' advisories. if both states have waterbodies that the site is in, pick the smaller number of meals
 tripcatch_site_2022 <- tripcatch_site_2022 |>
   mutate(advisory_meals = case_when(
     !is.na(md_adv) & !is.na(va_adv_meals) ~ pmin(md_adv,va_adv_meals), #pick the smaller number of meals if there are two
@@ -400,15 +340,10 @@ tripcatch_site_2022 <- tripcatch_site_2022 |>
     is.na(va_adv_meals) & is.na(va_adv_meals) & state == "VA" ~ 10, #assumes if site in virginia, no advisory means safe to eat. same assumption for MD, which was encoded earlier
     is.na(md_adv) & is.na(va_adv_meals) & state == "MD" ~ 10 #if site in md and advisory is na, then it's na
   ),
-  dne_eaten = case_when(
+  dne_eaten = case_when( #variable that is whether a fish with an advisory was eaten or not
     advisory_meals %in% list(0,1,2)  & landing != 0 ~ 1, #because there are only 23 observations such that dne happens
     TRUE ~ 0 # if no advisory data on it, assume safe to eat
-  ),
-  polluted_meals = case_when(
-    advisory_meals > 0 & landing > 0 ~ wgt_ab1*35.274/8 * 1/advisory_meals,#number of monthly pollution units consumed. convert from kg to ounces, divide by 8 ounces to get number of meals, divide by advisory_meals
-    advisory_meals == 0 & landing > 0 ~ wgt_ab1*35.274/8 * 2,
-    landing == 0 ~ 0), #if unsafe to eat, every meal is worth 2 monthly pollution units 
-  total_meals = wgt_ab1*35.274/8) 
+  )) 
 
 #check work for dne_eaten and advisory_meals
 inspect <- tripcatch_site_2022|>
@@ -428,90 +363,6 @@ get rid of useless variables
 #tripcatch_site_2022 <- tripcatch_site_2022|>
   #select(-strat_id,-psu_id,-AREA,-INTSITE,-TELEFON,-REEFCODE,-REEF,-geometry.x,-geometry.y)|> #by no means exhaustive list of useless variables
   #st_drop_geometry()
-```
-
-construct site level data
-
-```{r}
-site_choice <- tripcatch_site_2022 |>
-  select(#would be all site level characteristics plus water quality and advisories)
-  group_by(site_id)
-```
-
-```{r}
-library(mapboxapi)
-library(here)
-library(tidyverse)
-load(here('data','intermediate_datasets','tripcatch_site_2022.RData')) #only for running here
-load(here('data','intermediate_datasets','tripcatch_2022_zip.RData')) #zipcode shapefiles
-#add geometry of both site points and zip code polygons to tripcatch_site_2022
-load(here('data',"intermediate_datasets","active_sites.Rdata"))
-
-cb_access_wb_sf <- cb_access_sf |> 
-  mutate(site_id = paste(state_code,county_code,site_external_id,sep=""))
-#join to site geometry
-tripcatch_site_2022s <- tripcatch_site_2022 |>
-  left_join(cb_access_wb_sf|>select(site_id,geometry),by=("site_id")) #geometry y.y is sites
-tripcatch_site_2022s <- tripcatch_site_2022s |>
-  left_join(tripcatch_2022_zip|>select(ZCTA5CE20,geometry),by=c("ZIP"="ZCTA5CE20"))
-#geometry is zip codes
-tripcatch_site_2022s <- tripcatch_site_2022s |>
-  select(-geometry.x.x,-geometry.x,-geometry.y)
-
-pairs <- tripcatch_site_2022s|>
-  select(site_id,geometry.y.y, ZIP, geometry)|>
-  unique()
-
-#split noaa data into df's by site id
-site_dfs <- split(tripcatch_site_2022s,tripcatch_site_2022s$site_id)
-quack <- site_dfs[1]|>as.data.frame()
-trav<- mb_matrix(quack[,4],quack[,3][1])
-quack$travel_times <- trav
-
-output_list <- list()
-for (i in site_dfs) {
-    i <- as.data.frame(i)
-    travel_times <- mb_matrix(i[,4],i[,3][1])
-    i$travel_time <- travel_times
-    output_list <- append(output_list,i)
-    }
-#write forloop that would run mb_matrix on each of them and assign the mb_matrix results to new variable in each df
-#leftjoin main data to each new df by zip and site id
-#now want to run matrix on all. if run matrix now, will get every time from every zip-site combo. want to only get every time from every zip site combo in dataset.
-#group by site (fewer sites than zips), make dataset for every site, run matrix on that, get times, rejoin to dataset, rejoin datasets for each site together. must be better way of doing this??
-relevant_sites <- tripcatch_site_2022s |>
-  select(site_id,geometry.y.y) |>unique()
-relevant_zips <- tripcatch_site_2022s|>
-  select(ZIP,geometry)|>unique()
-
-#want to only run matrix on every combination that appears in dataset. so like, for every site, run matrix on all zips that appear for that site
-
-travel_times_1 <- mb_matrix(origins = relevant_sites,
-                            destinations = relevant_zips)
-
-travel_times_1 <- mb_matrix(tripcatch_site_2022s$geometry.x|>unique()|>head(10),
-                            tripcatch_site_2022s$geometry.y|>unique()|>head(10))
-
-
-quack <- tripcatch_site_2022s|>head(1)
-matrix_1 <- tripcatch_site_2022s|>
-  select(site_id, ZIP, geometry.x,geometry.y)|>
-  unique()|>
-  head(10)|>
-  mutate(driving_time = mb_matrix(geometry.x, geometry.y,allow_large_matrix = TRUE))
-
-```
-
-```{r}
-library(tigris)
-library(mapdeck)
-
-philly_tracts <- tracts("PA", "Philadelphia", cb = TRUE, class = "sf")
-downtown_philly <- mb_geocode("Philadelphia City Hall, Philadelphia PA")
-
-time_to_downtown <- mb_matrix(philly_tracts, downtown_philly)
-
-philly_tracts$time <- time_to_downtown
 ```
 
 save dataset
